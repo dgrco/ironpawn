@@ -1,0 +1,19 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-Wall",
+      "-Wextra",
+      "-g",
+      "-Iinclude",
+      "-O0",
+      "-c",
+      "-o",
+      "out/src/ironpawn.o",
+      "src/ironpawn.c"
+    ],
+    "directory": "/home/dg/projects/ironpawn",
+    "file": "/home/dg/projects/ironpawn/src/ironpawn.c",
+    "output": "/home/dg/projects/ironpawn/out/src/ironpawn.o"
+  }
+]
