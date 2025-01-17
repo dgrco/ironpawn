@@ -9,6 +9,40 @@
       "-O0",
       "-c",
       "-o",
+      "out/lib/utils.o",
+      "lib/utils.c"
+    ],
+    "directory": "/home/dg/projects/ironpawn",
+    "file": "/home/dg/projects/ironpawn/lib/utils.c",
+    "output": "/home/dg/projects/ironpawn/out/lib/utils.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-Wall",
+      "-Wextra",
+      "-g",
+      "-Iinclude",
+      "-O0",
+      "-c",
+      "-o",
+      "out/src/bitboard.o",
+      "src/bitboard.c"
+    ],
+    "directory": "/home/dg/projects/ironpawn",
+    "file": "/home/dg/projects/ironpawn/src/bitboard.c",
+    "output": "/home/dg/projects/ironpawn/out/src/bitboard.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-Wall",
+      "-Wextra",
+      "-g",
+      "-Iinclude",
+      "-O0",
+      "-c",
+      "-o",
       "out/src/ironpawn.o",
       "src/ironpawn.c"
     ],

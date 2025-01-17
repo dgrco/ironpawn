@@ -13,19 +13,25 @@ void handle_go(Vec *tokens);
 void test_bitboards();
 
 int main(int argc, char **argv) {
+  //
+  // DEBUGGING
   if (argc == 2 && str_eq(argv[1], "debug")) {
-    //
-    // DEBUGGING
-
+    // Bitboard test
     /*test_bitboards();*/
 
     // Magic bitboards
-    ChessBitboards bbs = bb_init_chess_boards(DEFAULT_FEN);
-    compute_and_export_magics(bbs.rook_blocker_masks, 20, "rook-magics.out");
-    /*compute_and_export_magics(bbs.bishop_blocker_masks, 10, "bishop-magics.out");*/
+    /*ChessBitboards bbs = bb_init_chess_boards(DEFAULT_FEN);*/
+    /*compute_and_export_magics(bbs.rook_blocker_masks, 20, "rook-magics.out");*/
+    /*compute_and_export_magics(bbs.bishop_blocker_masks, 20, "bishop-magics.out");*/
     return 0;
   }
 
+  //
+  // Engine Setup
+  
+
+  //
+  // Main Loop
   printf("IronPawn by Dante Grieco\n");
   while (1) {
     String input = str_create("");

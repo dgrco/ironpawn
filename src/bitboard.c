@@ -1,12 +1,11 @@
 #include "bitboard.h"
 #include <ctype.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
-#define MAX_ITERATION_STEPS 1
 
 /// Print a Bitboard in binary representation
 void bb_print(BITBOARD bb) {
@@ -304,6 +303,14 @@ typedef struct {
   unsigned int size;
 } DynArray;
 
+
+volatile sig_atomic_t terminate = 0;
+void __signal_handler(int signo) {
+  if (signo == SIGINT) {
+    terminate = 1;
+  }
+}
+
 void compute_and_export_magics(BITBOARD *blocker_masks,
                                unsigned int max_num_indices, char *filename) {
   // Magic number management
@@ -312,99 +319,73 @@ void compute_and_export_magics(BITBOARD *blocker_masks,
   memset(max_sizes, UINT64_MAX, 64 * sizeof(BITBOARD));
   unsigned int max_bit_shifts[64] = {0};
 
+  // Register the signal (Ctrl+C) to cleanup and force output magic output
+  // file
+  if (signal(SIGINT, __signal_handler) == SIG_ERR) {
+    perror("signal");
+    exit(1);
+  }
+
   unsigned long long iterated_squares = 0;
   unsigned long long iterations = 0;
   unsigned int min_bits_found = 64;
 
   // Setup blocker boards.
-  // blocker_board = blocker_mask & occupancy
-  DynArray blocker_boards[64];
+  // occupancy_board = blocker_mask & occupancy
+  DynArray occupancy_boards[64];
+  memset(occupancy_boards, 0, 64 * sizeof(DynArray));
   for (unsigned int i = 0; i < 64; i++) {
-    // Set up arrays that hold the indices of each set bit in this blocker mask
-    unsigned int set_bit_indices[64] = {
-        0}; // INFO: 64 is the max, much fewer will actually be used
-
-    BITBOARD curr_mask = blocker_masks[i];
-
-    unsigned int num_set_indices = 0, index = 0;
-    while (curr_mask != 0) {
-      if ((curr_mask & 0b1) == 1) {
-        set_bit_indices[num_set_indices] = index;
-        num_set_indices++;
-      }
-      curr_mask >>= 1;
-      index++;
+    // Initialize the occupancy boards
+    BITBOARD num_occupancies = 1ULL << __builtin_popcountll(blocker_masks[i]);
+    if (!occupancy_boards[i].data) {
+      occupancy_boards[i].data = (BITBOARD *)calloc(num_occupancies, sizeof(BITBOARD));
+      occupancy_boards[i].size = num_occupancies;
     }
-
-    // Initialize the blocker boards
-    BITBOARD num_boards = 1ULL << num_set_indices;
-    blocker_boards[i].data = (BITBOARD *)malloc(num_boards * sizeof(BITBOARD));
-    blocker_boards[i].size = num_boards;
 
     // Use the above array to perform a variant of binary counting
     // where each bit of the count is shifted according to the
     // currently iterated index in the array
-    for (unsigned int j = 0; j < num_boards; j++) {
-      index = 0;
-      unsigned int count = j;
-      do {
-        blocker_boards[i].data[j] |=
-            ((unsigned long long)(count & 0b1) << set_bit_indices[index]);
-        index++;
-        count >>= 1;
-      } while (count != 0);
+    for (unsigned int j = 0; j < num_occupancies; j++) {
+      BITBOARD curr_mask = blocker_masks[i];
+      unsigned long long j_cpy = j; // NOTE: this needs to be unsigned long long
+      while (j_cpy != 0) {
+        int index = __builtin_ctzll(curr_mask); // get LSB index
+        curr_mask &= curr_mask - 1; // clear LSB
+        occupancy_boards[i].data[j] |= (j_cpy & 1) << index;
+        j_cpy >>= 1;
+      }
     }
   }
 
   // Find the magic numbers.
-  char in[2] = {0};
+  srand(time(NULL));
   while (1) {
-    // Output handling
-    if (iterated_squares != 0 && iterations % MAX_ITERATION_STEPS == 0) {
-      printf("\n");
-      printf("Would you like to terminate and output the magics? If no, "
-             "another iteration of all the squares will be performed. (y/n): ");
-      fgets(in, 2, stdin);
-      in[1] = 0;
-      if (strncmp(in, "y", 1) == 0 || strncmp(in, "Y", 1) == 0) {
-        FILE *fp = fopen(filename, "w");
-        if (!fp) {
-          fprintf(stderr, "Unable to write to file %s\n", filename);
-          exit(1);
-        }
-
-        fprintf(fp, "magics = {");
-        for (unsigned int i = 0; i < 64; i++) {
-          fprintf(fp, "%llu%s", magics[i], i == 63 ? "}\n" : ", ");
-        }
-        fprintf(fp, "shifts = {");
-        for (unsigned int i = 0; i < 64; i++) {
-          fprintf(fp, "%u%s", max_bit_shifts[i], i == 63 ? "}\n" : ", ");
-        }
-        fprintf(fp, "sizes = {");
-        for (unsigned int i = 0; i < 64; i++) {
-          fprintf(fp, "%llu%s", max_sizes[i], i == 63 ? "}\n" : ", ");
-        }
-
-        fclose(fp);
-        break;
-      } // Anything other than "y/Y" is considered as "No".
+    if (terminate) {
+      // Program terminated...
+      break;
     }
 
-    srand(time(NULL));
     for (int i = 0; i < 64; i++) {
+      if (terminate) {
+        // Program terminated. Here is where the code will loop the majority of the time
+        // so it is crucial to check for termination here.
+        break;
+      }
+
       BITBOARD magic = __ull_rand();
       bool skip_flag = false;
 
-      unsigned int bit_shifts = max_bit_shifts[i] == 0 ? 64 - max_num_indices : max_bit_shifts[i];
+      unsigned int bit_shifts =
+          max_bit_shifts[i] == 0 ? 64 - max_num_indices : max_bit_shifts[i];
 
       bool unique_magic_result[1ULL << (64 - bit_shifts)];
-      memset(unique_magic_result, 0, (1ULL << (64 - bit_shifts)) * sizeof(_Bool));
+      memset(unique_magic_result, 0,
+             (1ULL << (64 - bit_shifts)) * sizeof(_Bool));
 
       BITBOARD max_magic_applied = 0;
 
-      for (unsigned int j = 0; j < blocker_boards[i].size; j++) {
-        BITBOARD blocker = blocker_boards[i].data[j];
+      for (unsigned int j = 0; j < occupancy_boards[i].size; j++) {
+        BITBOARD blocker = occupancy_boards[i].data[j];
         BITBOARD magic_applied = (blocker * magic) >> bit_shifts;
 
         if (magic_applied > max_magic_applied) {
@@ -441,7 +422,7 @@ void compute_and_export_magics(BITBOARD *blocker_masks,
         index++;
         max_magic_applied >>= 1;
       }
-      
+
       if (64 - max_bit_shifts[i] < min_bits_found) {
         min_bits_found = 64 - max_bit_shifts[i];
       }
@@ -452,16 +433,17 @@ void compute_and_export_magics(BITBOARD *blocker_masks,
       // Output progress
       printf("\033[2J"); // ANSI escape code to clear the screen
       printf("\033[H");  // ANSI escape code to move cursor to top-left
-      printf("Iteration: %llu / %d\n", iterations % MAX_ITERATION_STEPS + 1,
-             MAX_ITERATION_STEPS);
+      printf("Iteration: %llu\n", iterations);
       printf("Squares computed: %llu / 64\n", iterated_squares % 64 + 1);
       unsigned int size_sum = 0;
       for (unsigned int i = 0; i < 64; i++) {
         size_sum += max_sizes[i];
       }
       printf("Total size: %0.2f kB\n", size_sum / 1000.0f);
-      printf("Average Size Per Square: %0.2f kB\n", (size_sum / 64.0f) / 1000.0f);
+      printf("Average Size Per Square: %0.2f kB\n",
+             (size_sum / 64.0f) / 1000.0f);
       printf("Lowest Required Bit Count: %u\n", min_bits_found);
+      printf("(press Ctrl+C to terminate and output the magics output file)\n");
       fflush(stdout);
       iterated_squares++;
     }
@@ -470,11 +452,32 @@ void compute_and_export_magics(BITBOARD *blocker_masks,
 
   printf("\n");
 
+  FILE *fp = fopen(filename, "w");
+  if (!fp) {
+    fprintf(stderr, "Unable to write to file %s\n", filename);
+    exit(1);
+  }
+
+  fprintf(fp, "magics = {");
+  for (unsigned int i = 0; i < 64; i++) {
+    fprintf(fp, "%llu%s", magics[i], i == 63 ? "}\n" : ", ");
+  }
+  fprintf(fp, "shifts = {");
+  for (unsigned int i = 0; i < 64; i++) {
+    fprintf(fp, "%u%s", max_bit_shifts[i], i == 63 ? "}\n" : ", ");
+  }
+  fprintf(fp, "sizes = {");
+  for (unsigned int i = 0; i < 64; i++) {
+    fprintf(fp, "%llu%s", max_sizes[i], i == 63 ? "}\n" : ", ");
+  }
+
+  fclose(fp);
+
   // Free heap-allocated objects
   for (unsigned int i = 0; i < 64; i++) {
-    if (blocker_boards[i].data) {
-      free(blocker_boards[i].data);
-      blocker_boards[i].data = NULL;
+    if (occupancy_boards[i].data) {
+      free(occupancy_boards[i].data);
+      occupancy_boards[i].data = NULL;
     }
   }
 }
