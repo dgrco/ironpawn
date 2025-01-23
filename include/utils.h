@@ -61,10 +61,10 @@ Vec str_split(String *str);
 void str_replace(String *str, char *new_str, size_t maxlen);
 
 /// Print a String
-void str_print(String *str);
+void str_println(String *str);
 
 /// Print the debug info for a String
-void _str_printdebug(String *str);
+void str_printdebug(String *str);
 
 /////////////////////////////////
 
@@ -105,7 +105,7 @@ int vec_indexof(Vec *vec, enum VecType type, void *element);
 Vec vec_refsubvec(Vec *vec, size_t startpos, ssize_t endpos);
 
 /// Print the contents of the Vec
-void vec_print(Vec *vec, enum VecType type);
+void vec_println(Vec *vec, enum VecType type);
 
 /////////////////////////////////
 

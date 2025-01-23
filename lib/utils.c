@@ -149,7 +149,7 @@ void str_println(String *str) {
 }
 
 /// Print the debug info for a String
-void _str_printdebug(String *str) {
+void str_printdebug(String *str) {
   printf("{content: \"%s\", length: %lu, String address: %p, data address: %p}\n", str->data, str->len, str, str->data);
 }
 

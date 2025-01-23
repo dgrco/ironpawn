@@ -80,6 +80,6 @@ bool is_occupied(BITBOARD bb, unsigned int pos);
 
 //
 // Magic Bitboards
-void compute_and_export_magics(BITBOARD *blocker_masks, unsigned int max_num_indices, char *filename);
+void compute_and_export_magics(BITBOARD *blocker_masks, const unsigned int MAX_INDICES, char *filename);
 
 #endif // BITBOARD_H

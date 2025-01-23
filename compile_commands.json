@@ -43,11 +43,45 @@
       "-O0",
       "-c",
       "-o",
+      "out/src/engine.o",
+      "src/engine.c"
+    ],
+    "directory": "/home/dg/projects/ironpawn",
+    "file": "/home/dg/projects/ironpawn/src/engine.c",
+    "output": "/home/dg/projects/ironpawn/out/src/engine.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-Wall",
+      "-Wextra",
+      "-g",
+      "-Iinclude",
+      "-O0",
+      "-c",
+      "-o",
       "out/src/ironpawn.o",
       "src/ironpawn.c"
     ],
     "directory": "/home/dg/projects/ironpawn",
     "file": "/home/dg/projects/ironpawn/src/ironpawn.c",
     "output": "/home/dg/projects/ironpawn/out/src/ironpawn.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-Wall",
+      "-Wextra",
+      "-g",
+      "-Iinclude",
+      "-O0",
+      "-c",
+      "-o",
+      "out/src/magic_info.o",
+      "src/magic_info.c"
+    ],
+    "directory": "/home/dg/projects/ironpawn",
+    "file": "/home/dg/projects/ironpawn/src/magic_info.c",
+    "output": "/home/dg/projects/ironpawn/out/src/magic_info.o"
   }
 ]

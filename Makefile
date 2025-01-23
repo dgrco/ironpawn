@@ -24,5 +24,11 @@ run: $(BINARY)
 debug: $(BINARY)
 	./$(BINARY) debug
 
+rook_magic: $(BINARY)
+	./$(BINARY) rook_magic
+
+bishop_magic: $(BINARY)
+	./$(BINARY) bishop_magic
+
 clean:
 	rm -rf $(BINARY) out

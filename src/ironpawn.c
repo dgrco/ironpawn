@@ -1,7 +1,9 @@
+#include "bitboard.h"
+#include "engine.h"
+#include "magic_info.h"
+#include "utils.h"
 #include <limits.h>
 #include <stdlib.h>
-#include "utils.h"
-#include "bitboard.h"
 
 #define RANK_LEN 8
 #define DEFAULT_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -13,22 +15,37 @@ void handle_go(Vec *tokens);
 void test_bitboards();
 
 int main(int argc, char **argv) {
-  //
-  // DEBUGGING
-  if (argc == 2 && str_eq(argv[1], "debug")) {
-    // Bitboard test
-    /*test_bitboards();*/
+  if (argc == 2) {
+    if (str_eq(argv[1], "debug")) {
+      //
+      // DEBUGGING
+      // Bitboard test
+      /*test_bitboards();*/
 
-    // Magic bitboards
-    /*ChessBitboards bbs = bb_init_chess_boards(DEFAULT_FEN);*/
-    /*compute_and_export_magics(bbs.rook_blocker_masks, 20, "rook-magics.out");*/
-    /*compute_and_export_magics(bbs.bishop_blocker_masks, 20, "bishop-magics.out");*/
+      // Magic bitboards
+      /*ChessBitboards bbs = bb_init_chess_boards(DEFAULT_FEN);*/
+      /*compute_and_export_magics(bbs.rook_blocker_masks, 20,
+       * "rook-magics.out");*/
+      /*compute_and_export_magics(bbs.bishop_blocker_masks, 20,
+       * "bishop-magics.out");*/
+    } else if (str_eq(argv[1], "rook_magic")) {
+      ChessBitboards chess_bitboards = bb_init_chess_boards(DEFAULT_FEN);
+      compute_and_export_magics(chess_bitboards.rook_blocker_masks, 14,
+                                "rook-magics.out");
+    } else if (str_eq(argv[1], "bishop_magic")) {
+      ChessBitboards chess_bitboards = bb_init_chess_boards(DEFAULT_FEN);
+      compute_and_export_magics(chess_bitboards.bishop_blocker_masks, 14,
+                                "bishop-magics.out");
+    }
     return 0;
   }
 
   //
   // Engine Setup
-  
+  ChessBitboards chess_bitboards = bb_init_chess_boards(DEFAULT_FEN);
+  BITBOARD *rook_move_table[64], *bishop_move_table[64];
+  MagicInfo magic_info = init_magic_info();
+  engine_setup(&chess_bitboards, rook_move_table, bishop_move_table, &magic_info);
 
   //
   // Main Loop
@@ -104,7 +121,8 @@ void handle_go(Vec *tokens) {
   size_t btime = ULONG_MAX;
 
   int i;
-  // NOTE: using strtoul can enable unexpected results if negative values are passed.
+  // NOTE: using strtoul can enable unexpected results if negative values are
+  // passed.
   if ((i = vec_indexof(tokens, STRING, "depth")) != -1) {
     depth = strtoul(vec_get(tokens, i + 1), NULL, 10);
   }

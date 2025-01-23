@@ -1,5 +1,6 @@
 #include "bitboard.h"
 #include <ctype.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -303,7 +304,6 @@ typedef struct {
   unsigned int size;
 } DynArray;
 
-
 volatile sig_atomic_t terminate = 0;
 void __signal_handler(int signo) {
   if (signo == SIGINT) {
@@ -312,12 +312,12 @@ void __signal_handler(int signo) {
 }
 
 void compute_and_export_magics(BITBOARD *blocker_masks,
-                               unsigned int max_num_indices, char *filename) {
+                               const unsigned int MAX_INDICES, char *filename) {
   // Magic number management
   BITBOARD magics[64] = {0};
   BITBOARD max_sizes[64];
-  memset(max_sizes, UINT64_MAX, 64 * sizeof(BITBOARD));
-  unsigned int max_bit_shifts[64] = {0};
+  memset(max_sizes, (BITBOARD)INT_MAX, 64 * sizeof(BITBOARD));
+  unsigned int max_bits[64] = {0}; // the number of bits needed per square
 
   // Register the signal (Ctrl+C) to cleanup and force output magic output
   // file
@@ -338,7 +338,8 @@ void compute_and_export_magics(BITBOARD *blocker_masks,
     // Initialize the occupancy boards
     BITBOARD num_occupancies = 1ULL << __builtin_popcountll(blocker_masks[i]);
     if (!occupancy_boards[i].data) {
-      occupancy_boards[i].data = (BITBOARD *)calloc(num_occupancies, sizeof(BITBOARD));
+      occupancy_boards[i].data =
+          (BITBOARD *)calloc(num_occupancies, sizeof(BITBOARD));
       occupancy_boards[i].size = num_occupancies;
     }
 
@@ -347,10 +348,10 @@ void compute_and_export_magics(BITBOARD *blocker_masks,
     // currently iterated index in the array
     for (unsigned int j = 0; j < num_occupancies; j++) {
       BITBOARD curr_mask = blocker_masks[i];
-      unsigned long long j_cpy = j; // NOTE: this needs to be unsigned long long
+      unsigned long long j_cpy = j;
       while (j_cpy != 0) {
-        int index = __builtin_ctzll(curr_mask); // get LSB index
-        curr_mask &= curr_mask - 1; // clear LSB
+        unsigned int index = __builtin_ctzll(curr_mask); // get LSB index
+        curr_mask &= curr_mask - 1;                      // clear LSB
         occupancy_boards[i].data[j] |= (j_cpy & 1) << index;
         j_cpy >>= 1;
       }
@@ -367,20 +368,22 @@ void compute_and_export_magics(BITBOARD *blocker_masks,
 
     for (int i = 0; i < 64; i++) {
       if (terminate) {
-        // Program terminated. Here is where the code will loop the majority of the time
-        // so it is crucial to check for termination here.
+        // Program terminated. Here is where the code will loop the majority of
+        // the time so it is crucial to check for termination here.
         break;
       }
 
-      BITBOARD magic = __ull_rand();
+      // NOTE: doing multiple ANDs improves performance (not sure why?)
+      BITBOARD magic = __ull_rand() & __ull_rand() & __ull_rand();
       bool skip_flag = false;
 
+      // Use (bits - 1) since we are aiming to minimize bits
       unsigned int bit_shifts =
-          max_bit_shifts[i] == 0 ? 64 - max_num_indices : max_bit_shifts[i];
+          max_bits[i] == 0 ? 64 - (MAX_INDICES - 1): 64 - (max_bits[i] - 1);
 
       bool unique_magic_result[1ULL << (64 - bit_shifts)];
       memset(unique_magic_result, 0,
-             (1ULL << (64 - bit_shifts)) * sizeof(_Bool));
+             (unsigned long long)((1ULL << (64 - bit_shifts)) * sizeof(_Bool)));
 
       BITBOARD max_magic_applied = 0;
 
@@ -413,18 +416,11 @@ void compute_and_export_magics(BITBOARD *blocker_masks,
       // Update the max size for this square
       max_sizes[i] = max_magic_applied;
 
-      // Set and update bit shift values
-      unsigned int index = 0;
-      while (max_magic_applied != 0) {
-        if ((max_magic_applied & 1) == 1) {
-          max_bit_shifts[i] = 64 - index;
-        }
-        index++;
-        max_magic_applied >>= 1;
-      }
+      // Set and update bit values
+      max_bits[i] = 64 - bit_shifts;
 
-      if (64 - max_bit_shifts[i] < min_bits_found) {
-        min_bits_found = 64 - max_bit_shifts[i];
+      if (max_bits[i] < min_bits_found) {
+        min_bits_found = max_bits[i];
       }
 
       // Update the magic value to this improved number
@@ -434,7 +430,7 @@ void compute_and_export_magics(BITBOARD *blocker_masks,
       printf("\033[2J"); // ANSI escape code to clear the screen
       printf("\033[H");  // ANSI escape code to move cursor to top-left
       printf("Iteration: %llu\n", iterations);
-      printf("Squares computed: %llu / 64\n", iterated_squares % 64 + 1);
+      printf("Square: %llu / 64\n", iterated_squares % 64 + 1);
       unsigned int size_sum = 0;
       for (unsigned int i = 0; i < 64; i++) {
         size_sum += max_sizes[i];
@@ -447,6 +443,7 @@ void compute_and_export_magics(BITBOARD *blocker_masks,
       fflush(stdout);
       iterated_squares++;
     }
+
     iterations++;
   }
 
@@ -458,17 +455,11 @@ void compute_and_export_magics(BITBOARD *blocker_masks,
     exit(1);
   }
 
-  fprintf(fp, "magics = {");
   for (unsigned int i = 0; i < 64; i++) {
-    fprintf(fp, "%llu%s", magics[i], i == 63 ? "}\n" : ", ");
+    fprintf(fp, "%llu%s", magics[i], i == 63 ? "\n" : " ");
   }
-  fprintf(fp, "shifts = {");
   for (unsigned int i = 0; i < 64; i++) {
-    fprintf(fp, "%u%s", max_bit_shifts[i], i == 63 ? "}\n" : ", ");
-  }
-  fprintf(fp, "sizes = {");
-  for (unsigned int i = 0; i < 64; i++) {
-    fprintf(fp, "%llu%s", max_sizes[i], i == 63 ? "}\n" : ", ");
+    fprintf(fp, "%u%s", 64 - max_bits[i], i == 63 ? "\n" : " ");
   }
 
   fclose(fp);
