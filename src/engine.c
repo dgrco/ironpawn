@@ -1,8 +1,12 @@
 #include "engine.h"
 #include "bitboard.h"
+#include "utils.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#define RANK_2_MASK (BITBOARD) 0xFF << 8
+#define RANK_7_MASK (BITBOARD) 0xFF << 48
 
 /**
  * @brief Sets up a table.
@@ -121,4 +125,306 @@ void __table_cleanup(BITBOARD **table) {
 void engine_cleanup(BITBOARD **rook_move_table, BITBOARD **bishop_move_table) {
   __table_cleanup(rook_move_table);
   __table_cleanup(bishop_move_table);
+}
+
+/**
+ * @brief Computes all pseudo-legal moves given the current board.
+ *
+ * @param bbs: An initialized ChessBitboards object.
+ * @param magic: An initialized MagicInfo object.
+ * @param color: The color to generate moves from.
+ * @return A Vec of MoveInfo values.
+ * @note This returned Vec must be freed using vec_free().
+ */
+Vec engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
+                                      enum PieceColor color) {
+  Vec moves = vec_create();
+
+  if (color == WHITE) {
+    //
+    // White
+
+    // Knights
+    BITBOARD w_knights_copy = bbs->white_knights;
+    while (w_knights_copy) {
+      unsigned int from_pos = POP_LSB(w_knights_copy);
+      BITBOARD w_knight_moves_copy = bbs->knight_moves[from_pos];
+      while (w_knight_moves_copy) {
+        unsigned int to_pos = POP_LSB(w_knight_moves_copy);
+        if ((1ULL << to_pos) & ~bbs->white_pieces) {
+          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
+          *move = from_pos | (to_pos << 6);
+          vec_append(&moves, move);
+        }
+      }
+    }
+
+    // King
+    BITBOARD w_king_copy = bbs->white_king;
+    while (w_king_copy) {
+      unsigned int from_pos = POP_LSB(w_king_copy);
+      BITBOARD w_king_moves_copy = bbs->king_moves[from_pos];
+      while (w_king_moves_copy) {
+        unsigned int to_pos = POP_LSB(w_king_moves_copy);
+        if ((1ULL << to_pos) & ~bbs->white_pieces) {
+          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
+          *move = from_pos | (to_pos << 6);
+          vec_append(&moves, move);
+        }
+      }
+    }
+
+    // Rooks
+    BITBOARD w_rook_copy = bbs->white_rooks;
+    while (w_rook_copy) {
+      unsigned int from_pos = POP_LSB(w_rook_copy);
+      BITBOARD blocker = bbs->rook_blocker_masks[from_pos] & bbs->all_pieces;
+      BITBOARD magic_index = (blocker * magic->ROOK_MAGICS[from_pos]) >>
+                             magic->ROOK_SHIFTS[from_pos];
+      BITBOARD w_rook_moves_copy = bbs->rook_move_table[from_pos][magic_index];
+      while (w_rook_moves_copy) {
+        unsigned int to_pos = POP_LSB(w_rook_moves_copy);
+        if ((1ULL << to_pos) & ~bbs->white_pieces) {
+          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
+          *move = from_pos | (to_pos << 6);
+          vec_append(&moves, move);
+        }
+      }
+    }
+
+    // Bishop
+    BITBOARD w_bishop_copy = bbs->white_bishops;
+    while (w_bishop_copy) {
+      unsigned int from_pos = POP_LSB(w_bishop_copy);
+      BITBOARD blocker = bbs->bishop_blocker_masks[from_pos] & bbs->all_pieces;
+      BITBOARD magic_index = (blocker * magic->BISHOP_MAGICS[from_pos]) >>
+                             magic->BISHOP_SHIFTS[from_pos];
+      BITBOARD w_bishop_moves_copy =
+          bbs->bishop_move_table[from_pos][magic_index];
+      while (w_bishop_moves_copy) {
+        unsigned int to_pos = POP_LSB(w_bishop_moves_copy);
+        if ((1ULL << to_pos) & ~bbs->white_pieces) {
+          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
+          *move = from_pos | (to_pos << 6);
+          vec_append(&moves, move);
+        }
+      }
+    }
+
+    // Queen
+    BITBOARD w_queen_copy = bbs->white_queens;
+    while (w_queen_copy) {
+      unsigned int from_pos = POP_LSB(w_queen_copy);
+
+      // Diagonals
+      BITBOARD diag_blocker =
+          bbs->bishop_blocker_masks[from_pos] & bbs->all_pieces;
+      BITBOARD diag_magic_index =
+          (diag_blocker * magic->BISHOP_MAGICS[from_pos]) >>
+          magic->BISHOP_SHIFTS[from_pos];
+      BITBOARD w_diag_moves_copy =
+          bbs->bishop_move_table[from_pos][diag_magic_index];
+      while (w_diag_moves_copy) {
+        unsigned int to_pos = POP_LSB(w_diag_moves_copy);
+        if ((1ULL << to_pos) & ~bbs->white_pieces) {
+          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
+          *move = from_pos | (to_pos << 6);
+          vec_append(&moves, move);
+        }
+      }
+
+      // Straights
+      BITBOARD straight_blocker =
+          bbs->rook_blocker_masks[from_pos] & bbs->all_pieces;
+      BITBOARD straight_magic_index =
+          (straight_blocker * magic->ROOK_MAGICS[from_pos]) >>
+          magic->ROOK_SHIFTS[from_pos];
+      BITBOARD w_straight_moves_copy =
+          bbs->rook_move_table[from_pos][straight_magic_index];
+      while (w_straight_moves_copy) {
+        unsigned int to_pos = POP_LSB(w_straight_moves_copy);
+        if ((1ULL << to_pos) & ~bbs->white_pieces) {
+          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
+          *move = from_pos | (to_pos << 6);
+          vec_append(&moves, move);
+        }
+      }
+    }
+
+    // Pawns TODO: en passant
+    BITBOARD single_push = (bbs->white_pawns << 8) & bbs->empty_squares;
+    BITBOARD double_push = ((bbs->white_pawns & RANK_2_MASK) << 16) &
+                           bbs->empty_squares & (bbs->empty_squares << 8);
+    while (single_push) {
+      unsigned int to_pos = POP_LSB(single_push);
+      unsigned int from_pos = to_pos - 8;
+      MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
+      *move = from_pos | (to_pos << 6);
+      vec_append(&moves, move);
+    }
+    while (double_push) {
+      unsigned int to_pos = POP_LSB(double_push);
+      unsigned int from_pos = to_pos - 16;
+      MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
+      *move = from_pos | (to_pos << 6);
+      vec_append(&moves, move);
+    }
+
+    BITBOARD pawns_copy = bbs->white_pawns;
+    while (pawns_copy) {
+      unsigned int from_pos = POP_LSB(pawns_copy);
+      BITBOARD capture_mask = bbs->white_pawn_captures[from_pos];
+      BITBOARD possible_captures = bbs->black_pieces & capture_mask;
+      while (possible_captures) {
+        unsigned int to_pos = POP_LSB(possible_captures);
+        MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
+        *move = from_pos | (to_pos << 6);
+        vec_append(&moves, move);
+      }
+    }
+  } else if (color == BLACK) {
+    //
+    // Black
+
+    // Knights
+    BITBOARD b_knights_copy = bbs->black_knights;
+    while (b_knights_copy) {
+      unsigned int from_pos = POP_LSB(b_knights_copy);
+      BITBOARD b_knight_moves_copy = bbs->knight_moves[from_pos];
+      while (b_knight_moves_copy) {
+        unsigned int to_pos = POP_LSB(b_knight_moves_copy);
+        if ((1ULL << to_pos) & ~bbs->black_pieces) {
+          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
+          *move = from_pos | (to_pos << 6);
+          vec_append(&moves, move);
+        }
+      }
+    }
+
+    // King
+    BITBOARD b_king_copy = bbs->black_king;
+    while (b_king_copy) {
+      unsigned int from_pos = POP_LSB(b_king_copy);
+      BITBOARD b_king_moves_copy = bbs->king_moves[from_pos];
+      while (b_king_moves_copy) {
+        unsigned int to_pos = POP_LSB(b_king_moves_copy);
+        if ((1ULL << to_pos) & ~bbs->black_pieces) {
+          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
+          *move = from_pos | (to_pos << 6);
+          vec_append(&moves, move);
+        }
+      }
+    }
+
+    // Rooks
+    BITBOARD b_rook_copy = bbs->black_rooks;
+    while (b_rook_copy) {
+      unsigned int from_pos = POP_LSB(b_rook_copy);
+      BITBOARD blocker = bbs->rook_blocker_masks[from_pos] & bbs->all_pieces;
+      BITBOARD magic_index = (blocker * magic->ROOK_MAGICS[from_pos]) >>
+                             magic->ROOK_SHIFTS[from_pos];
+      BITBOARD b_rook_moves_copy = bbs->rook_move_table[from_pos][magic_index];
+      while (b_rook_moves_copy) {
+        unsigned int to_pos = POP_LSB(b_rook_moves_copy);
+        if ((1ULL << to_pos) & ~bbs->black_pieces) {
+          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
+          *move = from_pos | (to_pos << 6);
+          vec_append(&moves, move);
+        }
+      }
+    }
+
+    // Bishop
+    BITBOARD b_bishop_copy = bbs->black_bishops;
+    while (b_bishop_copy) {
+      unsigned int from_pos = POP_LSB(b_bishop_copy);
+      BITBOARD blocker = bbs->bishop_blocker_masks[from_pos] & bbs->all_pieces;
+      BITBOARD magic_index = (blocker * magic->BISHOP_MAGICS[from_pos]) >>
+                             magic->BISHOP_SHIFTS[from_pos];
+      BITBOARD b_bishop_moves_copy =
+          bbs->bishop_move_table[from_pos][magic_index];
+      while (b_bishop_moves_copy) {
+        unsigned int to_pos = POP_LSB(b_bishop_moves_copy);
+        if ((1ULL << to_pos) & ~bbs->black_pieces) {
+          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
+          *move = from_pos | (to_pos << 6);
+          vec_append(&moves, move);
+        }
+      }
+    }
+
+    // Queen
+    BITBOARD b_queen_copy = bbs->black_queens;
+    while (b_queen_copy) {
+      unsigned int from_pos = POP_LSB(b_queen_copy);
+
+      // Diagonals
+      BITBOARD diag_blocker =
+          bbs->bishop_blocker_masks[from_pos] & bbs->all_pieces;
+      BITBOARD diag_magic_index =
+          (diag_blocker * magic->BISHOP_MAGICS[from_pos]) >>
+          magic->BISHOP_SHIFTS[from_pos];
+      BITBOARD b_diag_moves_copy =
+          bbs->bishop_move_table[from_pos][diag_magic_index];
+      while (b_diag_moves_copy) {
+        unsigned int to_pos = POP_LSB(b_diag_moves_copy);
+        if ((1ULL << to_pos) & ~bbs->black_pieces) {
+          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
+          *move = from_pos | (to_pos << 6);
+          vec_append(&moves, move);
+        }
+      }
+
+      // Straights
+      BITBOARD straight_blocker =
+          bbs->rook_blocker_masks[from_pos] & bbs->all_pieces;
+      BITBOARD straight_magic_index =
+          (straight_blocker * magic->ROOK_MAGICS[from_pos]) >>
+          magic->ROOK_SHIFTS[from_pos];
+      BITBOARD b_straight_moves_copy =
+          bbs->rook_move_table[from_pos][straight_magic_index];
+      while (b_straight_moves_copy) {
+        unsigned int to_pos = POP_LSB(b_straight_moves_copy);
+        if ((1ULL << to_pos) & ~bbs->black_pieces) {
+          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
+          *move = from_pos | (to_pos << 6);
+          vec_append(&moves, move);
+        }
+      }
+    }
+
+    // Pawns TODO: en passant
+    BITBOARD single_push = (bbs->black_pawns >> 8) & bbs->empty_squares;
+    BITBOARD double_push = ((bbs->black_pawns & RANK_7_MASK) >> 16) &
+                           bbs->empty_squares & (bbs->empty_squares >> 8);
+    while (single_push) {
+      unsigned int to_pos = POP_LSB(single_push);
+      unsigned int from_pos = to_pos + 8;
+      MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
+      *move = from_pos | (to_pos << 6);
+      vec_append(&moves, move);
+    }
+    while (double_push) {
+      unsigned int to_pos = POP_LSB(double_push);
+      unsigned int from_pos = to_pos + 16;
+      MoveInfo *move =  (MoveInfo *)malloc(1 * sizeof(MoveInfo));
+      *move = from_pos | (to_pos << 6);
+      vec_append(&moves, move);
+    }
+
+    BITBOARD pawns_copy = bbs->black_pawns;
+    while (pawns_copy) {
+      unsigned int from_pos = POP_LSB(pawns_copy);
+      BITBOARD capture_mask = bbs->black_pawn_captures[from_pos];
+      BITBOARD possible_captures = bbs->white_pieces & capture_mask;
+      while (possible_captures) {
+        unsigned int to_pos = POP_LSB(possible_captures);
+        MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
+        *move = from_pos | (to_pos << 6);
+        vec_append(&moves, move);
+      }
+    }
+  }
+
+  return moves;
 }

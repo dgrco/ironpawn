@@ -4,20 +4,19 @@
 #include <stdbool.h>
 typedef unsigned long long BITBOARD;
 
-enum PieceType {
-  EMPTY,
-  PAWN,
-  BISHOP,
-  KNIGHT,
-  ROOK,
-  QUEEN,
-  KING
-};
+// TODO: port all relevant code to use this macro
 
-enum PieceColor {
-  WHITE = 8,
-  BLACK = 16
-};
+/// Return the LSB index of a value and clear the LSB.
+#define POP_LSB(value)                                                         \
+  ({                                                                           \
+    unsigned int lsb_index = __builtin_ctzll(value);                           \
+    value &= value - 1;                                                        \
+    lsb_index;                                                                 \
+  })
+
+enum PieceType { EMPTY, PAWN, BISHOP, KNIGHT, ROOK, QUEEN, KING };
+
+enum PieceColor { WHITE = 8, BLACK = 16 };
 
 typedef struct {
   // White bitboards
@@ -45,8 +44,14 @@ typedef struct {
   // Precomputation tables
   BITBOARD knight_moves[64];
   BITBOARD king_moves[64];
+  BITBOARD black_pawn_moves[64];
   BITBOARD rook_blocker_masks[64];
   BITBOARD bishop_blocker_masks[64];
+  BITBOARD white_pawn_captures[64];
+  BITBOARD black_pawn_captures[64];
+  // To be initialized outside of the init function:
+  BITBOARD **rook_move_table;   // Should point to a BITBOARD [64]
+  BITBOARD **bishop_move_table; // Should point to a BITBOARD [64]
 } ChessBitboards;
 
 void bb_print(BITBOARD bb);
@@ -80,6 +85,7 @@ bool is_occupied(BITBOARD bb, unsigned int pos);
 
 //
 // Magic Bitboards
-void compute_and_export_magics(BITBOARD *blocker_masks, const unsigned int MAX_INDICES, char *filename);
+void compute_and_export_magics(BITBOARD *blocker_masks,
+                               const unsigned int MAX_INDICES, char *filename);
 
 #endif // BITBOARD_H

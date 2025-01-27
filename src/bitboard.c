@@ -8,6 +8,9 @@
 #include <string.h>
 #include <time.h>
 
+#define FILE_A 0x4040404040404040
+#define FILE_H 0x0101010101010101
+
 /// Print a Bitboard in binary representation
 void bb_print(BITBOARD bb) {
   for (unsigned int i = 0; i < 64; i++) {
@@ -21,7 +24,7 @@ void bb_print(BITBOARD bb) {
 void bb_pretty_print(BITBOARD bb) {
   for (unsigned int i = 0; i < 8; i++) {
     for (unsigned int j = 0; j < 8; j++) {
-      printf("%c ", ((bb >> (63 - (i * 8 + j))) & 0b1) == 1 ? 'X' : '.');
+      printf("%c ", ((bb >> (63 - (i * 8 + j))) & 0b1) == 1 ? 'x' : '.');
     }
     printf("\n");
   }
@@ -205,6 +208,26 @@ BITBOARD __get_blocking_diag_mask(unsigned int pos) {
   return mask;
 }
 
+/**
+ * @brief Obtain pawn capture masks for a given square position.
+ *
+ * @param pos: square position (pos 0 -> h1, pos 63 -> a8)
+ * @param capture_offsets: a list of 2 elements giving the offsets for pawn
+ * captures. NOTE: the format should be {file_a_facing_offset, file_h_facing_offset}.
+ * TODO: change the param to a struct for clarity.
+ *
+ * @return The capture mask for the given square position.
+ */
+BITBOARD __get_pawn_capture_mask(unsigned int pos, int capture_offsets[2]) {
+  BITBOARD capture_mask = 0;
+
+  // WARN: is casting important here?
+  capture_mask |= (1ULL << (unsigned long long)(pos + capture_offsets[0])) & ~FILE_A;
+  capture_mask |= (1ULL << (unsigned long long)(pos + capture_offsets[1])) & ~FILE_H;
+
+  return capture_mask;
+}
+
 /// Initialize the ChessBitboards structure.
 ChessBitboards bb_init_chess_boards(char *board_str) {
   ChessBitboards chess_bbs = {
@@ -223,21 +246,37 @@ ChessBitboards bb_init_chess_boards(char *board_str) {
       .black_king = init_black_king(board_str),
   };
 
+  //
   // Cumulative bitboards
   chess_bbs.white_pieces = init_white_pieces(&chess_bbs);
   chess_bbs.black_pieces = init_black_pieces(&chess_bbs);
   chess_bbs.all_pieces = init_all_pieces(&chess_bbs);
   chess_bbs.empty_squares = init_empty_squares(&chess_bbs);
 
+  //
   // Precomputation tables
+
+  // Knights
   for (unsigned int i = 0; i < 64; i++) {
     chess_bbs.knight_moves[i] = __get_knight_move_bb(i);
   }
 
+  // Kings
   for (unsigned int i = 0; i < 64; i++) {
     chess_bbs.king_moves[i] = __get_king_move_bb(i);
   }
 
+  // Pawns
+  int white_capture_offsets[2] = {7, 9};
+  int black_capture_offsets[2] = {-7, -9};
+  for (unsigned int i = 0; i < 64; i++) {
+    chess_bbs.white_pawn_captures[i] =
+        __get_pawn_capture_mask(i, white_capture_offsets);
+    chess_bbs.black_pawn_captures[i] =
+        __get_pawn_capture_mask(i, black_capture_offsets);
+  }
+
+  // Get blocker masks for rooks/bishops... to be used in magic setup
   for (unsigned int i = 0; i < 64; i++) {
     chess_bbs.rook_blocker_masks[i] = __get_blocking_ray_mask(i);
     chess_bbs.bishop_blocker_masks[i] = __get_blocking_diag_mask(i);
@@ -373,13 +412,12 @@ void compute_and_export_magics(BITBOARD *blocker_masks,
         break;
       }
 
-      // NOTE: doing multiple ANDs improves performance (not sure why?)
       BITBOARD magic = __ull_rand() & __ull_rand() & __ull_rand();
       bool skip_flag = false;
 
       // Use (bits - 1) since we are aiming to minimize bits
       unsigned int bit_shifts =
-          max_bits[i] == 0 ? 64 - (MAX_INDICES - 1): 64 - (max_bits[i] - 1);
+          max_bits[i] == 0 ? 64 - (MAX_INDICES - 1) : 64 - (max_bits[i] - 1);
 
       bool unique_magic_result[1ULL << (64 - bit_shifts)];
       memset(unique_magic_result, 0,

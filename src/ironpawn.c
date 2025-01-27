@@ -10,7 +10,7 @@
 
 void handle_uci();
 void handle_position(Vec *tokens);
-void handle_go(Vec *tokens);
+void handle_go(Vec *tokens, ChessBitboards *bbs, MagicInfo *magic);
 
 void test_bitboards();
 
@@ -46,6 +46,8 @@ int main(int argc, char **argv) {
   BITBOARD *rook_move_table[64], *bishop_move_table[64];
   MagicInfo magic_info = init_magic_info();
   engine_setup(&chess_bitboards, rook_move_table, bishop_move_table, &magic_info);
+  chess_bitboards.rook_move_table = rook_move_table;
+  chess_bitboards.bishop_move_table = bishop_move_table;
 
   //
   // Main Loop
@@ -64,13 +66,16 @@ int main(int argc, char **argv) {
     } else if (str_eq(first_token, "position")) {
       handle_position(&tokens);
     } else if (str_eq(first_token, "go")) {
-      handle_go(&tokens);
+      handle_go(&tokens, &chess_bitboards, &magic_info);
     } else {
       printf("Unknown command: %s", input.data);
     }
     vec_free(&tokens);
     str_free(&input);
   }
+
+  // Engine Cleanup
+  engine_cleanup(rook_move_table, bishop_move_table);
 
   return 0;
 }
@@ -114,11 +119,21 @@ void handle_position(Vec *tokens) {
   vec_freeref(&moves);
 }
 
-void handle_go(Vec *tokens) {
+void handle_go(Vec *tokens, ChessBitboards *bbs, MagicInfo *magic) {
   size_t depth = ULONG_MAX;
   size_t movetime = ULONG_MAX;
   size_t wtime = ULONG_MAX;
   size_t btime = ULONG_MAX;
+  
+  // test
+  Vec moves = engine_generate_pseudolegal_moves(bbs, magic, BLACK);
+  for (unsigned int i = 0; i < moves.len; i++) {
+    printf("from:\n");
+    bb_pretty_print(1ULL << ((*(BITBOARD*)vec_get(&moves, i) & ((1ULL << 6) - 1))));
+    printf("to:\n");
+    bb_pretty_print(1ULL << ((*(BITBOARD*)vec_get(&moves, i) & (((1ULL << 6) - 1) << 6)) >> 6));
+  }
+  vec_free(&moves);
 
   int i;
   // NOTE: using strtoul can enable unexpected results if negative values are

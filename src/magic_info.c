@@ -42,6 +42,9 @@ void __set_magic_info(unsigned long long *magics, unsigned int *shifts,
   }
   str_free(&line);
   vec_free(&shifts_vec);
+
+  free(buffer);
+  fclose(fp);
 }
 
 /**
