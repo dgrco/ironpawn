@@ -289,7 +289,7 @@ ChessBitboards bb_init_chess_boards(char *board_str) {
 void set_bit(BITBOARD *bb, unsigned int pos) { *bb |= (1ULL << pos); }
 
 /// Clear a bit to 0. NOTE: a1 is index 0, h8 is index 63.
-void clear_bit(BITBOARD *bb, unsigned int pos) { *bb &= !(1ULL << pos); }
+void clear_bit(BITBOARD *bb, unsigned int pos) { *bb &= ~(1ULL << pos); }
 
 /// Toggle a bit. NOTE: a1 is index 0, h8 is index 63.
 void toggle_bit(BITBOARD *bb, unsigned int pos) { *bb ^= (1ULL << pos); }

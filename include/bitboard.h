@@ -16,7 +16,11 @@ typedef unsigned long long BITBOARD;
 
 enum PieceType { EMPTY, PAWN, BISHOP, KNIGHT, ROOK, QUEEN, KING };
 
-enum PieceColor { WHITE = 8, BLACK = 16 };
+enum PieceColor {
+  NOCOLOR = 0,
+  WHITE = 8,
+  BLACK = 16
+}; // TODO: maybe use the values... I don't know yet
 
 typedef struct {
   // White bitboards

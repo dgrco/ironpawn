@@ -1,6 +1,7 @@
 #include "bitboard.h"
 #include "engine.h"
 #include "magic_info.h"
+#include "search.h"
 #include "utils.h"
 #include <limits.h>
 #include <stdlib.h>
@@ -45,7 +46,8 @@ int main(int argc, char **argv) {
   ChessBitboards chess_bitboards = bb_init_chess_boards(DEFAULT_FEN);
   BITBOARD *rook_move_table[64], *bishop_move_table[64];
   MagicInfo magic_info = init_magic_info();
-  engine_setup(&chess_bitboards, rook_move_table, bishop_move_table, &magic_info);
+  engine_setup(&chess_bitboards, rook_move_table, bishop_move_table,
+               &magic_info);
   chess_bitboards.rook_move_table = rook_move_table;
   chess_bitboards.bishop_move_table = bishop_move_table;
 
@@ -67,6 +69,10 @@ int main(int argc, char **argv) {
       handle_position(&tokens);
     } else if (str_eq(first_token, "go")) {
       handle_go(&tokens, &chess_bitboards, &magic_info);
+    } else if (str_eq(first_token, "print_white")) {
+      bb_pretty_print(chess_bitboards.white_pieces);
+    } else if (str_eq(first_token, "print_black")) {
+      bb_pretty_print(chess_bitboards.black_pieces);
     } else {
       printf("Unknown command: %s", input.data);
     }
@@ -120,20 +126,10 @@ void handle_position(Vec *tokens) {
 }
 
 void handle_go(Vec *tokens, ChessBitboards *bbs, MagicInfo *magic) {
-  size_t depth = ULONG_MAX;
+  size_t depth = 6;
   size_t movetime = ULONG_MAX;
   size_t wtime = ULONG_MAX;
   size_t btime = ULONG_MAX;
-  
-  // test
-  Vec moves = engine_generate_pseudolegal_moves(bbs, magic, BLACK);
-  for (unsigned int i = 0; i < moves.len; i++) {
-    printf("from:\n");
-    bb_pretty_print(1ULL << ((*(BITBOARD*)vec_get(&moves, i) & ((1ULL << 6) - 1))));
-    printf("to:\n");
-    bb_pretty_print(1ULL << ((*(BITBOARD*)vec_get(&moves, i) & (((1ULL << 6) - 1) << 6)) >> 6));
-  }
-  vec_free(&moves);
 
   int i;
   // NOTE: using strtoul can enable unexpected results if negative values are
@@ -150,6 +146,12 @@ void handle_go(Vec *tokens, ChessBitboards *bbs, MagicInfo *magic) {
   if ((i = vec_indexof(tokens, STRING, "btime")) != -1) {
     btime = strtoul(vec_get(tokens, i + 1), NULL, 10);
   }
+
+  EvalResult eval_res = search(bbs, magic, depth, WHITE);
+  String chess_not = move_info_to_chess_notation(eval_res.best_move);
+  printf("bestmove %s\n", chess_not.data);
+  printf("score: %d\n", eval_res.eval);
+  str_free(&chess_not); 
 }
 
 /// End of UCI

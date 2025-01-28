@@ -3,7 +3,7 @@ CODEDIRS=lib src
 INCDIRS=include
 
 CC=gcc
-OPT=-O0
+OPT=-O3
 CFLAGS=-Wall -Wextra -g $(foreach D,$(INCDIRS),-I$(D)) $(OPT)
 
 CFILES=$(foreach D,$(CODEDIRS),$(wildcard $(D)/*.c))

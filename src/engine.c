@@ -5,9 +5,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define RANK_2_MASK (BITBOARD) 0xFF << 8
-#define RANK_7_MASK (BITBOARD) 0xFF << 48
-
 /**
  * @brief Sets up a table.
  *
@@ -407,7 +404,7 @@ Vec engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
     while (double_push) {
       unsigned int to_pos = POP_LSB(double_push);
       unsigned int from_pos = to_pos + 16;
-      MoveInfo *move =  (MoveInfo *)malloc(1 * sizeof(MoveInfo));
+      MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
       *move = from_pos | (to_pos << 6);
       vec_append(&moves, move);
     }
@@ -427,4 +424,302 @@ Vec engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
   }
 
   return moves;
+}
+
+/**
+ * @brief Determine if a color is in check.
+ *
+ * @param bbs: An existing ChessBitboards object.
+ * @param magic: An initialized MagicInfo object.
+ * @param color: The color in question.
+ * @return Will return true if the color in question is in check, and false
+ * otherwise.
+ */
+bool engine_color_in_check(ChessBitboards *bbs, MagicInfo *magic_info,
+                           enum PieceColor color) {
+  if (color == WHITE) {
+    //
+    // Is white in check?
+    Vec potential_moves =
+        engine_generate_pseudolegal_moves(bbs, magic_info, BLACK);
+
+    for (unsigned int i = 0; i < potential_moves.len; i++) {
+      unsigned int to_pos =
+          GET_TO_POS(*(MoveInfo *)vec_get(&potential_moves, i));
+      if ((1ULL << to_pos) & bbs->white_king) {
+        vec_free(&potential_moves);
+        return true;
+      }
+    }
+
+    vec_free(&potential_moves);
+  } else if (color == BLACK) {
+    //
+    // Is black in check?
+    Vec potential_moves =
+        engine_generate_pseudolegal_moves(bbs, magic_info, WHITE);
+
+    for (unsigned int i = 0; i < potential_moves.len; i++) {
+      unsigned int to_pos =
+          GET_TO_POS(*(MoveInfo *)vec_get(&potential_moves, i));
+      if ((1ULL << to_pos) & bbs->black_king) {
+        vec_free(&potential_moves);
+        return true;
+      }
+    }
+
+    vec_free(&potential_moves);
+  }
+
+  return false;
+}
+
+/**
+ * @brief Get the Piece at a certain square position.
+ *
+ * @param bbs: An existing ChessBitboards object.
+ * @param pos: The square position.
+ * @return The Piece at position `pos`.
+ */
+Piece __get_piece_at(ChessBitboards *bbs, unsigned int pos) {
+  BITBOARD mask = 1ULL << pos;
+
+  if ((bbs->all_pieces & mask) == 0)
+    return (Piece){.type = EMPTY, .color = NOCOLOR};
+
+  // White pieces
+  if (bbs->white_pawns & mask)
+    return (Piece){.type = PAWN, .color = WHITE};
+  if (bbs->white_bishops & mask)
+    return (Piece){.type = BISHOP, .color = WHITE};
+  if (bbs->white_knights & mask)
+    return (Piece){.type = KNIGHT, .color = WHITE};
+  if (bbs->white_rooks & mask)
+    return (Piece){.type = ROOK, .color = WHITE};
+  if (bbs->white_queens & mask)
+    return (Piece){.type = QUEEN, .color = WHITE};
+  if (bbs->white_king & mask)
+    return (Piece){.type = KING, .color = WHITE};
+
+  // Black
+  if (bbs->black_pawns & mask)
+    return (Piece){.type = PAWN, .color = BLACK};
+  if (bbs->black_bishops & mask)
+    return (Piece){.type = BISHOP, .color = BLACK};
+  if (bbs->black_knights & mask)
+    return (Piece){.type = KNIGHT, .color = BLACK};
+  if (bbs->black_rooks & mask)
+    return (Piece){.type = ROOK, .color = BLACK};
+  if (bbs->black_queens & mask)
+    return (Piece){.type = QUEEN, .color = BLACK};
+  if (bbs->black_king & mask)
+    return (Piece){.type = KING, .color = BLACK};
+
+  return (Piece){.type = EMPTY, .color = NOCOLOR};
+}
+
+void __update_capture_bitboards(ChessBitboards *bbs, Piece *piece,
+                                unsigned int to_pos) {
+  if (piece->color == NOCOLOR)
+    return;
+
+  if (piece->color == WHITE) {
+    // White
+    if (piece->type == PAWN) {
+      clear_bit(&bbs->white_pawns, to_pos);
+    } else if (piece->type == BISHOP) {
+      clear_bit(&bbs->white_bishops, to_pos);
+    } else if (piece->type == KNIGHT) {
+      clear_bit(&bbs->white_knights, to_pos);
+    } else if (piece->type == ROOK) {
+      clear_bit(&bbs->white_rooks, to_pos);
+    } else if (piece->type == QUEEN) {
+      clear_bit(&bbs->white_queens, to_pos);
+    } else if (piece->type == KING) {
+      clear_bit(&bbs->white_king, to_pos);
+    }
+
+    clear_bit(&bbs->white_pieces, to_pos);
+
+  } else if (piece->color == BLACK) {
+    // Black
+    if (piece->type == PAWN) {
+      clear_bit(&bbs->black_pawns, to_pos);
+    } else if (piece->type == BISHOP) {
+      clear_bit(&bbs->black_bishops, to_pos);
+    } else if (piece->type == KNIGHT) {
+      clear_bit(&bbs->black_knights, to_pos);
+    } else if (piece->type == ROOK) {
+      clear_bit(&bbs->black_rooks, to_pos);
+    } else if (piece->type == QUEEN) {
+      clear_bit(&bbs->black_queens, to_pos);
+    } else if (piece->type == KING) {
+      clear_bit(&bbs->black_king, to_pos);
+    }
+
+    clear_bit(&bbs->black_pieces, to_pos);
+  }
+
+  clear_bit(&bbs->all_pieces, to_pos);
+  set_bit(&bbs->empty_squares, to_pos);
+}
+
+/**
+ * @brief Make a move and update all relevant bitboards in bbs.
+ *
+ * @param bbs: An existing ChessBitboards object.
+ * @param from_pos: Where the piece to move originates.
+ * @param to_pos: Where the piece to move lands.
+ * @return The captured piece.
+ */
+Piece engine_move(ChessBitboards *bbs, unsigned int from_pos,
+                  unsigned int to_pos) {
+  Piece moving_piece = __get_piece_at(bbs, from_pos);
+  Piece captured_piece = __get_piece_at(bbs, to_pos);
+
+  if (moving_piece.color == WHITE) {
+    // White
+    if (moving_piece.type == PAWN) {
+      set_bit(&bbs->white_pawns, to_pos);
+      clear_bit(&bbs->white_pawns, from_pos);
+    } else if (moving_piece.type == BISHOP) {
+      set_bit(&bbs->white_bishops, to_pos);
+      clear_bit(&bbs->white_bishops, from_pos);
+    } else if (moving_piece.type == KNIGHT) {
+      set_bit(&bbs->white_knights, to_pos);
+      clear_bit(&bbs->white_knights, from_pos);
+    } else if (moving_piece.type == ROOK) {
+      set_bit(&bbs->white_rooks, to_pos);
+      clear_bit(&bbs->white_rooks, from_pos);
+    } else if (moving_piece.type == QUEEN) {
+      set_bit(&bbs->white_queens, to_pos);
+      clear_bit(&bbs->white_queens, from_pos);
+    } else if (moving_piece.type == KING) {
+      set_bit(&bbs->white_king, to_pos);
+      clear_bit(&bbs->white_king, from_pos);
+    }
+
+    set_bit(&bbs->white_pieces, to_pos);
+    clear_bit(&bbs->white_pieces, from_pos);
+
+    __update_capture_bitboards(bbs, &captured_piece, to_pos);
+
+  } else if (moving_piece.color == BLACK) {
+    // Black
+    if (moving_piece.type == PAWN) {
+      set_bit(&bbs->black_pawns, to_pos);
+      clear_bit(&bbs->black_pawns, from_pos);
+    } else if (moving_piece.type == BISHOP) {
+      set_bit(&bbs->black_bishops, to_pos);
+      clear_bit(&bbs->black_bishops, from_pos);
+    } else if (moving_piece.type == KNIGHT) {
+      set_bit(&bbs->black_knights, to_pos);
+      clear_bit(&bbs->black_knights, from_pos);
+    } else if (moving_piece.type == ROOK) {
+      set_bit(&bbs->black_rooks, to_pos);
+      clear_bit(&bbs->black_rooks, from_pos);
+    } else if (moving_piece.type == QUEEN) {
+      set_bit(&bbs->black_queens, to_pos);
+      clear_bit(&bbs->black_queens, from_pos);
+    } else if (moving_piece.type == KING) {
+      set_bit(&bbs->black_king, to_pos);
+      clear_bit(&bbs->black_king, from_pos);
+    }
+
+    set_bit(&bbs->black_pieces, to_pos);
+    clear_bit(&bbs->black_pieces, from_pos);
+
+    __update_capture_bitboards(bbs, &captured_piece, to_pos);
+  }
+
+  set_bit(&bbs->all_pieces, to_pos);
+  clear_bit(&bbs->all_pieces, from_pos);
+
+  clear_bit(&bbs->empty_squares, to_pos);
+  set_bit(&bbs->empty_squares, from_pos);
+
+  return captured_piece;
+}
+
+/**
+ * @brief Replace the piece that may have been captured.
+ *
+ * @param bbs: An existing ChessBitboards object.
+ * @param captured: The captured piece to be re-placed back.
+ * @param captured_pos: The position which the piece was captured at.
+ */
+void engine_undo_capture(ChessBitboards *bbs, Piece *captured,
+                         unsigned int captured_pos) {
+  if (captured->color == NOCOLOR)
+    return;
+
+  if (captured->color == WHITE) {
+    // White
+    if (captured->type == PAWN) {
+      set_bit(&bbs->white_pawns, captured_pos);
+    } else if (captured->type == BISHOP) {
+      set_bit(&bbs->white_bishops, captured_pos);
+    } else if (captured->type == KNIGHT) {
+      set_bit(&bbs->white_knights, captured_pos);
+    } else if (captured->type == ROOK) {
+      set_bit(&bbs->white_rooks, captured_pos);
+    } else if (captured->type == QUEEN) {
+      set_bit(&bbs->white_queens, captured_pos);
+    } else if (captured->type == KING) {
+      set_bit(&bbs->white_king, captured_pos);
+    }
+
+    set_bit(&bbs->white_pieces, captured_pos);
+
+  } else if (captured->color == BLACK) {
+    // Black
+    if (captured->type == PAWN) {
+      set_bit(&bbs->black_pawns, captured_pos);
+    } else if (captured->type == BISHOP) {
+      set_bit(&bbs->black_bishops, captured_pos);
+    } else if (captured->type == KNIGHT) {
+      set_bit(&bbs->black_knights, captured_pos);
+    } else if (captured->type == ROOK) {
+      set_bit(&bbs->black_rooks, captured_pos);
+    } else if (captured->type == QUEEN) {
+      set_bit(&bbs->black_queens, captured_pos);
+    } else if (captured->type == KING) {
+      set_bit(&bbs->black_king, captured_pos);
+    }
+
+    set_bit(&bbs->black_pieces, captured_pos);
+  }
+
+  set_bit(&bbs->all_pieces, captured_pos);
+  clear_bit(&bbs->empty_squares, captured_pos);
+}
+
+/**
+ * @brief Returns a String of the move in chess notation (i.e., e2e4)
+ *
+ * @param move: The MoveInfo value.
+ * @return A String in chess notation. NOTE: this must be freed using
+ * str_free().
+ */
+String move_info_to_chess_notation(MoveInfo move) {
+  char buffer[5] = {0};
+  String str;
+
+  unsigned int from_pos = GET_FROM_POS(move);
+  unsigned int from_rank = from_pos / 8 + 1;
+  unsigned int from_file = 7 - from_pos % 8;
+
+  unsigned int to_pos = GET_TO_POS(move);
+  unsigned int to_rank = to_pos / 8 + 1;
+  unsigned int to_file = 7 - to_pos % 8;
+
+  const char FILE_CHARS[8] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
+
+  buffer[0] = FILE_CHARS[from_file];
+  buffer[1] = '0' + from_rank;
+  buffer[2] = FILE_CHARS[to_file];
+  buffer[3] = '0' + to_rank;
+
+  str = str_create(buffer);
+  return str;
 }
