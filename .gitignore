@@ -1,4 +1,8 @@
 out/
+.cache/
+
 compile_commands.json
 ironpawn
-.cache/
+
+engine.wasm
+engine.js

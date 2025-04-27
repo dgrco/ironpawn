@@ -18,8 +18,8 @@ enum PieceType { EMPTY, PAWN, BISHOP, KNIGHT, ROOK, QUEEN, KING };
 
 enum PieceColor {
   NOCOLOR = 0,
-  WHITE = 8,
-  BLACK = 16
+  WHITE = 1,
+  BLACK = -1,
 }; // TODO: maybe use the values... I don't know yet
 
 typedef struct {
@@ -80,7 +80,7 @@ BITBOARD init_black_pieces(ChessBitboards *bbs);
 BITBOARD init_all_pieces(ChessBitboards *bbs);
 BITBOARD init_empty_squares(ChessBitboards *bbs);
 
-ChessBitboards bb_init_chess_boards(char *board_str);
+void bb_init_chess_boards(ChessBitboards *bbs, char *board_str);
 
 void set_bit(BITBOARD *bb, unsigned int pos);
 void clear_bit(BITBOARD *bb, unsigned int pos);

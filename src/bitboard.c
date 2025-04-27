@@ -229,60 +229,56 @@ BITBOARD __get_pawn_capture_mask(unsigned int pos, int capture_offsets[2]) {
 }
 
 /// Initialize the ChessBitboards structure.
-ChessBitboards bb_init_chess_boards(char *board_str) {
-  ChessBitboards chess_bbs = {
-      .white_pawns = init_white_pawns(board_str),
-      .white_bishops = init_white_bishops(board_str),
-      .white_knights = init_white_knights(board_str),
-      .white_rooks = init_white_rooks(board_str),
-      .white_queens = init_white_queens(board_str),
-      .white_king = init_white_king(board_str),
+void bb_init_chess_boards(ChessBitboards *bbs, char *board_str) {
+  bbs->white_pawns = init_white_pawns(board_str);
+  bbs->white_bishops = init_white_bishops(board_str);
+  bbs->white_knights = init_white_knights(board_str);
+  bbs->white_rooks = init_white_rooks(board_str);
+  bbs->white_queens = init_white_queens(board_str);
+  bbs->white_king = init_white_king(board_str);
 
-      .black_pawns = init_black_pawns(board_str),
-      .black_bishops = init_black_bishops(board_str),
-      .black_knights = init_black_knights(board_str),
-      .black_rooks = init_black_rooks(board_str),
-      .black_queens = init_black_queens(board_str),
-      .black_king = init_black_king(board_str),
-  };
+  bbs->black_pawns = init_black_pawns(board_str);
+  bbs->black_bishops = init_black_bishops(board_str);
+  bbs->black_knights = init_black_knights(board_str);
+  bbs->black_rooks = init_black_rooks(board_str);
+  bbs->black_queens = init_black_queens(board_str);
+  bbs->black_king = init_black_king(board_str);
 
   //
   // Cumulative bitboards
-  chess_bbs.white_pieces = init_white_pieces(&chess_bbs);
-  chess_bbs.black_pieces = init_black_pieces(&chess_bbs);
-  chess_bbs.all_pieces = init_all_pieces(&chess_bbs);
-  chess_bbs.empty_squares = init_empty_squares(&chess_bbs);
+  bbs->white_pieces = init_white_pieces(bbs);
+  bbs->black_pieces = init_black_pieces(bbs);
+  bbs->all_pieces = init_all_pieces(bbs);
+  bbs->empty_squares = init_empty_squares(bbs);
 
   //
   // Precomputation tables
 
   // Knights
   for (unsigned int i = 0; i < 64; i++) {
-    chess_bbs.knight_moves[i] = __get_knight_move_bb(i);
+    bbs->knight_moves[i] = __get_knight_move_bb(i);
   }
 
   // Kings
   for (unsigned int i = 0; i < 64; i++) {
-    chess_bbs.king_moves[i] = __get_king_move_bb(i);
+    bbs->king_moves[i] = __get_king_move_bb(i);
   }
 
   // Pawns
   int white_capture_offsets[2] = {7, 9};
   int black_capture_offsets[2] = {-7, -9};
   for (unsigned int i = 0; i < 64; i++) {
-    chess_bbs.white_pawn_captures[i] =
+    bbs->white_pawn_captures[i] =
         __get_pawn_capture_mask(i, white_capture_offsets);
-    chess_bbs.black_pawn_captures[i] =
+    bbs->black_pawn_captures[i] =
         __get_pawn_capture_mask(i, black_capture_offsets);
   }
 
   // Get blocker masks for rooks/bishops... to be used in magic setup
   for (unsigned int i = 0; i < 64; i++) {
-    chess_bbs.rook_blocker_masks[i] = __get_blocking_ray_mask(i);
-    chess_bbs.bishop_blocker_masks[i] = __get_blocking_diag_mask(i);
+    bbs->rook_blocker_masks[i] = __get_blocking_ray_mask(i);
+    bbs->bishop_blocker_masks[i] = __get_blocking_diag_mask(i);
   }
-
-  return chess_bbs;
 }
 
 /// Set a bit to 1. NOTE: a1 is index 0, h8 is index 63.

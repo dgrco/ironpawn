@@ -22,7 +22,7 @@ void __table_setup(BITBOARD *blockers, BITBOARD **table, unsigned int i,
   table[i] = (BITBOARD *)calloc(1ULL << (64 - SHIFTS[i]), sizeof(BITBOARD));
 
   // Go through each relevant occupancy board and compute legal moves
-  BITBOARD blocker_mask = blockers[i]; // TODO: generalize
+  BITBOARD blocker_mask = blockers[i];
   const unsigned int NUM_SET_BITS = __builtin_popcountll(blocker_mask);
   const unsigned long long TOTAL_BIT_VARIANTS = 1ULL << NUM_SET_BITS;
 
@@ -129,13 +129,14 @@ void engine_cleanup(BITBOARD **rook_move_table, BITBOARD **bishop_move_table) {
  *
  * @param bbs: An initialized ChessBitboards object.
  * @param magic: An initialized MagicInfo object.
+ * @param moves: The array to assign moves.
  * @param color: The color to generate moves from.
  * @return A Vec of MoveInfo values.
- * @note This returned Vec must be freed using vec_free().
  */
-Vec engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
-                                      enum PieceColor color) {
-  Vec moves = vec_create();
+void engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
+                                       MoveArray *move_arr,
+                                       enum PieceColor color) {
+  move_arr->len = 0;
 
   if (color == WHITE) {
     //
@@ -149,9 +150,8 @@ Vec engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
       while (w_knight_moves_copy) {
         unsigned int to_pos = POP_LSB(w_knight_moves_copy);
         if ((1ULL << to_pos) & ~bbs->white_pieces) {
-          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
-          *move = from_pos | (to_pos << 6);
-          vec_append(&moves, move);
+          move_info_t move = from_pos | (to_pos << 6);
+          move_arr->moves[move_arr->len++] = move;
         }
       }
     }
@@ -164,9 +164,8 @@ Vec engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
       while (w_king_moves_copy) {
         unsigned int to_pos = POP_LSB(w_king_moves_copy);
         if ((1ULL << to_pos) & ~bbs->white_pieces) {
-          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
-          *move = from_pos | (to_pos << 6);
-          vec_append(&moves, move);
+          move_info_t move = from_pos | (to_pos << 6);
+          move_arr->moves[move_arr->len++] = move;
         }
       }
     }
@@ -182,9 +181,8 @@ Vec engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
       while (w_rook_moves_copy) {
         unsigned int to_pos = POP_LSB(w_rook_moves_copy);
         if ((1ULL << to_pos) & ~bbs->white_pieces) {
-          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
-          *move = from_pos | (to_pos << 6);
-          vec_append(&moves, move);
+          move_info_t move = from_pos | (to_pos << 6);
+          move_arr->moves[move_arr->len++] = move;
         }
       }
     }
@@ -201,9 +199,8 @@ Vec engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
       while (w_bishop_moves_copy) {
         unsigned int to_pos = POP_LSB(w_bishop_moves_copy);
         if ((1ULL << to_pos) & ~bbs->white_pieces) {
-          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
-          *move = from_pos | (to_pos << 6);
-          vec_append(&moves, move);
+          move_info_t move = from_pos | (to_pos << 6);
+          move_arr->moves[move_arr->len++] = move;
         }
       }
     }
@@ -224,9 +221,8 @@ Vec engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
       while (w_diag_moves_copy) {
         unsigned int to_pos = POP_LSB(w_diag_moves_copy);
         if ((1ULL << to_pos) & ~bbs->white_pieces) {
-          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
-          *move = from_pos | (to_pos << 6);
-          vec_append(&moves, move);
+          move_info_t move = from_pos | (to_pos << 6);
+          move_arr->moves[move_arr->len++] = move;
         }
       }
 
@@ -241,9 +237,8 @@ Vec engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
       while (w_straight_moves_copy) {
         unsigned int to_pos = POP_LSB(w_straight_moves_copy);
         if ((1ULL << to_pos) & ~bbs->white_pieces) {
-          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
-          *move = from_pos | (to_pos << 6);
-          vec_append(&moves, move);
+          move_info_t move = from_pos | (to_pos << 6);
+          move_arr->moves[move_arr->len++] = move;
         }
       }
     }
@@ -255,16 +250,14 @@ Vec engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
     while (single_push) {
       unsigned int to_pos = POP_LSB(single_push);
       unsigned int from_pos = to_pos - 8;
-      MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
-      *move = from_pos | (to_pos << 6);
-      vec_append(&moves, move);
+      move_info_t move = from_pos | (to_pos << 6);
+      move_arr->moves[move_arr->len++] = move;
     }
     while (double_push) {
       unsigned int to_pos = POP_LSB(double_push);
       unsigned int from_pos = to_pos - 16;
-      MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
-      *move = from_pos | (to_pos << 6);
-      vec_append(&moves, move);
+      move_info_t move = from_pos | (to_pos << 6);
+      move_arr->moves[move_arr->len++] = move;
     }
 
     BITBOARD pawns_copy = bbs->white_pawns;
@@ -274,9 +267,8 @@ Vec engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
       BITBOARD possible_captures = bbs->black_pieces & capture_mask;
       while (possible_captures) {
         unsigned int to_pos = POP_LSB(possible_captures);
-        MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
-        *move = from_pos | (to_pos << 6);
-        vec_append(&moves, move);
+        move_info_t move = from_pos | (to_pos << 6);
+        move_arr->moves[move_arr->len++] = move;
       }
     }
   } else if (color == BLACK) {
@@ -291,9 +283,8 @@ Vec engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
       while (b_knight_moves_copy) {
         unsigned int to_pos = POP_LSB(b_knight_moves_copy);
         if ((1ULL << to_pos) & ~bbs->black_pieces) {
-          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
-          *move = from_pos | (to_pos << 6);
-          vec_append(&moves, move);
+          move_info_t move = from_pos | (to_pos << 6);
+          move_arr->moves[move_arr->len++] = move;
         }
       }
     }
@@ -306,9 +297,8 @@ Vec engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
       while (b_king_moves_copy) {
         unsigned int to_pos = POP_LSB(b_king_moves_copy);
         if ((1ULL << to_pos) & ~bbs->black_pieces) {
-          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
-          *move = from_pos | (to_pos << 6);
-          vec_append(&moves, move);
+          move_info_t move = from_pos | (to_pos << 6);
+          move_arr->moves[move_arr->len++] = move;
         }
       }
     }
@@ -324,9 +314,8 @@ Vec engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
       while (b_rook_moves_copy) {
         unsigned int to_pos = POP_LSB(b_rook_moves_copy);
         if ((1ULL << to_pos) & ~bbs->black_pieces) {
-          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
-          *move = from_pos | (to_pos << 6);
-          vec_append(&moves, move);
+          move_info_t move = from_pos | (to_pos << 6);
+          move_arr->moves[move_arr->len++] = move;
         }
       }
     }
@@ -343,9 +332,8 @@ Vec engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
       while (b_bishop_moves_copy) {
         unsigned int to_pos = POP_LSB(b_bishop_moves_copy);
         if ((1ULL << to_pos) & ~bbs->black_pieces) {
-          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
-          *move = from_pos | (to_pos << 6);
-          vec_append(&moves, move);
+          move_info_t move = from_pos | (to_pos << 6);
+          move_arr->moves[move_arr->len++] = move;
         }
       }
     }
@@ -366,9 +354,8 @@ Vec engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
       while (b_diag_moves_copy) {
         unsigned int to_pos = POP_LSB(b_diag_moves_copy);
         if ((1ULL << to_pos) & ~bbs->black_pieces) {
-          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
-          *move = from_pos | (to_pos << 6);
-          vec_append(&moves, move);
+          move_info_t move = from_pos | (to_pos << 6);
+          move_arr->moves[move_arr->len++] = move;
         }
       }
 
@@ -383,9 +370,8 @@ Vec engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
       while (b_straight_moves_copy) {
         unsigned int to_pos = POP_LSB(b_straight_moves_copy);
         if ((1ULL << to_pos) & ~bbs->black_pieces) {
-          MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
-          *move = from_pos | (to_pos << 6);
-          vec_append(&moves, move);
+          move_info_t move = from_pos | (to_pos << 6);
+          move_arr->moves[move_arr->len++] = move;
         }
       }
     }
@@ -397,16 +383,14 @@ Vec engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
     while (single_push) {
       unsigned int to_pos = POP_LSB(single_push);
       unsigned int from_pos = to_pos + 8;
-      MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
-      *move = from_pos | (to_pos << 6);
-      vec_append(&moves, move);
+      move_info_t move = from_pos | (to_pos << 6);
+      move_arr->moves[move_arr->len++] = move;
     }
     while (double_push) {
       unsigned int to_pos = POP_LSB(double_push);
       unsigned int from_pos = to_pos + 16;
-      MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
-      *move = from_pos | (to_pos << 6);
-      vec_append(&moves, move);
+      move_info_t move = from_pos | (to_pos << 6);
+      move_arr->moves[move_arr->len++] = move;
     }
 
     BITBOARD pawns_copy = bbs->black_pawns;
@@ -416,14 +400,11 @@ Vec engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
       BITBOARD possible_captures = bbs->white_pieces & capture_mask;
       while (possible_captures) {
         unsigned int to_pos = POP_LSB(possible_captures);
-        MoveInfo *move = (MoveInfo *)malloc(1 * sizeof(MoveInfo));
-        *move = from_pos | (to_pos << 6);
-        vec_append(&moves, move);
+        move_info_t move = from_pos | (to_pos << 6);
+        move_arr->moves[move_arr->len++] = move;
       }
     }
   }
-
-  return moves;
 }
 
 /**
@@ -437,38 +418,30 @@ Vec engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
  */
 bool engine_color_in_check(ChessBitboards *bbs, MagicInfo *magic_info,
                            enum PieceColor color) {
+  MoveArray potential_moves;
+
   if (color == WHITE) {
     //
     // Is white in check?
-    Vec potential_moves =
-        engine_generate_pseudolegal_moves(bbs, magic_info, BLACK);
+    engine_generate_pseudolegal_moves(bbs, magic_info, &potential_moves, BLACK);
 
     for (unsigned int i = 0; i < potential_moves.len; i++) {
-      unsigned int to_pos =
-          GET_TO_POS(*(MoveInfo *)vec_get(&potential_moves, i));
+      unsigned int to_pos = GET_TO_POS(potential_moves.moves[i]);
       if ((1ULL << to_pos) & bbs->white_king) {
-        vec_free(&potential_moves);
         return true;
       }
     }
-
-    vec_free(&potential_moves);
   } else if (color == BLACK) {
     //
     // Is black in check?
-    Vec potential_moves =
-        engine_generate_pseudolegal_moves(bbs, magic_info, WHITE);
+    engine_generate_pseudolegal_moves(bbs, magic_info, &potential_moves, WHITE);
 
     for (unsigned int i = 0; i < potential_moves.len; i++) {
-      unsigned int to_pos =
-          GET_TO_POS(*(MoveInfo *)vec_get(&potential_moves, i));
+      unsigned int to_pos = GET_TO_POS(potential_moves.moves[i]);
       if ((1ULL << to_pos) & bbs->black_king) {
-        vec_free(&potential_moves);
         return true;
       }
     }
-
-    vec_free(&potential_moves);
   }
 
   return false;
@@ -701,7 +674,7 @@ void engine_undo_capture(ChessBitboards *bbs, Piece *captured,
  * @return A String in chess notation. NOTE: this must be freed using
  * str_free().
  */
-String move_info_to_chess_notation(MoveInfo move) {
+String move_info_to_chess_notation(move_info_t move) {
   char buffer[5] = {0};
   String str;
 

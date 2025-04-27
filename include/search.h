@@ -5,7 +5,7 @@
 #include "engine.h"
 
 typedef struct {
-  MoveInfo best_move;
+  move_info_t best_move;
   int eval;
 } EvalResult;
 

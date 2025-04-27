@@ -24,7 +24,14 @@ typedef struct {
  * bits 6-11: The 'to' position (0-63).
  * bits 12-15: TODO: special flags (en passant, etc.).
  */
-typedef uint16_t MoveInfo;
+typedef uint16_t move_info_t;
+
+typedef struct {
+  // NOTE: According to sources, 218 is the max number of moves, but I will use
+  // 256 just in case :)
+  move_info_t moves[256];
+  unsigned int len;
+} MoveArray;
 
 /**
  * @brief Setup the engine, including precomputation of move lookup tables.
@@ -53,12 +60,12 @@ void engine_cleanup(BITBOARD **rook_move_table, BITBOARD **bishop_move_table);
  *
  * @param bbs: An initialized ChessBitboards object.
  * @param magic: An initialized MagicInfo object.
+ * @param moves: The array to assign moves.
  * @param color: The color to generate moves from.
  * @return A Vec of MoveInfo values.
- * @note This returned Vec must be freed using vec_free().
  */
-Vec engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
-                                      enum PieceColor color);
+void engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
+                                       MoveArray *moves, enum PieceColor color);
 /**
  * @brief Determine if a color is in check.
  *
@@ -99,6 +106,6 @@ void engine_undo_capture(ChessBitboards *bbs, Piece *captured,
  * @return A String in chess notation. NOTE: this must be freed using
  * str_free().
  */
-String move_info_to_chess_notation(MoveInfo move);
+String move_info_to_chess_notation(move_info_t move);
 
 #endif // ENGINE_H
