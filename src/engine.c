@@ -126,12 +126,12 @@ void engine_cleanup(BITBOARD **rook_move_table, BITBOARD **bishop_move_table) {
 
 /**
  * @brief Computes all pseudo-legal moves given the current board.
+ * The moves are set in `move_arr`.
  *
  * @param bbs: An initialized ChessBitboards object.
  * @param magic: An initialized MagicInfo object.
- * @param moves: The array to assign moves.
+ * @param move_arr: The array to assign moves.
  * @param color: The color to generate moves from.
- * @return A Vec of MoveInfo values.
  */
 void engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
                                        MoveArray *move_arr,
@@ -445,6 +445,44 @@ bool engine_color_in_check(ChessBitboards *bbs, MagicInfo *magic_info,
   }
 
   return false;
+}
+
+/**
+ * @brief Determine if a color is in checkmate or stalemate.
+ *
+ * @param bbs: An existing ChessBitboards object.
+ * @param magic: An initialized MagicInfo object.
+ * @param color: The color in question.
+ * @return 1 if checkmate, 2 if stalemate, 0 otherwise.
+ */
+int engine_check_game_over(ChessBitboards *bbs, MagicInfo *magic,
+                           enum PieceColor color) {
+    MoveArray moves;
+    engine_generate_pseudolegal_moves(bbs, magic, &moves, color);
+
+    for (unsigned int i = 0; i < moves.len; i++) {
+        unsigned int from_pos = GET_FROM_POS(moves.moves[i]);
+        unsigned int to_pos = GET_TO_POS(moves.moves[i]);
+
+        // Make the move
+        Piece captured = engine_move(bbs, from_pos, to_pos);
+
+        bool still_in_check = engine_color_in_check(bbs, magic, color);
+
+        // Undo the move — move piece back, restore capture
+        engine_move(bbs, to_pos, from_pos);
+        engine_undo_capture(bbs, &captured, to_pos);
+
+        if (!still_in_check) {
+            return 0; // Found at least one legal move, game not over
+        }
+    }
+
+    // No legal moves found
+    if (engine_color_in_check(bbs, magic, color)) {
+        return 1; // Checkmate
+    }
+    return 2; // Stalemate
 }
 
 /**

@@ -79,6 +79,17 @@ bool engine_color_in_check(ChessBitboards *bbs, MagicInfo *magic_info,
                            enum PieceColor color);
 
 /**
+ * @brief Determine if a color is in checkmate or stalemate.
+ *
+ * @param bbs: An existing ChessBitboards object.
+ * @param magic: An initialized MagicInfo object.
+ * @param color: The color in question.
+ * @return 1 if checkmate, 2 if stalemate, 0 otherwise.
+ */
+int engine_check_game_over(ChessBitboards *bbs, MagicInfo *magic,
+                           enum PieceColor color);
+
+/**
  * @brief Make a move and update all relevant bitboards in bbs.
  *
  * @param bbs: An existing ChessBitboards object.

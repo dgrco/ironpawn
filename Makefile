@@ -37,7 +37,7 @@ bishop_magic: $(BINARY)
 	./$(BINARY) bishop_magic
 
 wasm: $(CFILES) $(EMCFILES)
-	$(EMCC) $(CFLAGS) $(EMFLAGS) $(CFILES) $(EMCFILES) -o $(WASM_OUT) 
+	$(EMCC) $(CFLAGS) $(EMFLAGS) $(CFILES) $(EMCFILES) -o $(WASM_OUT)
 
 .PHONY: wasm
 

@@ -8,9 +8,6 @@
 #include <string.h>
 #include <time.h>
 
-#define FILE_A 0x4040404040404040
-#define FILE_H 0x0101010101010101
-
 /// Print a Bitboard in binary representation
 void bb_print(BITBOARD bb) {
   for (unsigned int i = 0; i < 64; i++) {
@@ -220,10 +217,22 @@ BITBOARD __get_blocking_diag_mask(unsigned int pos) {
  */
 BITBOARD __get_pawn_capture_mask(unsigned int pos, int capture_offsets[2]) {
   BITBOARD capture_mask = 0;
+  int file = pos % 8;
+  int rank = pos / 8;
 
-  // WARN: is casting important here?
-  capture_mask |= (1ULL << (unsigned long long)(pos + capture_offsets[0])) & ~FILE_A;
-  capture_mask |= (1ULL << (unsigned long long)(pos + capture_offsets[1])) & ~FILE_H;
+  // capture_offsets[0] is the "left" capture (toward file A)
+  int left_file = file - 1;
+  int left_rank = rank + (capture_offsets[0] > 0 ? 1 : -1);
+  if (left_file >= 0 && left_rank >= 0 && left_rank < 8) {
+    capture_mask |= 1ULL << (left_rank * 8 + left_file);
+  }
+
+  // capture_offsets[1] is the "right" capture (toward file H)
+  int right_file = file + 1;
+  int right_rank = rank + (capture_offsets[1] > 0 ? 1 : -1);
+  if (right_file < 8 && right_rank >= 0 && right_rank < 8) {
+    capture_mask |= 1ULL << (right_rank * 8 + right_file);
+  }
 
   return capture_mask;
 }

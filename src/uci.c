@@ -73,13 +73,35 @@ void handle_go(Vec *tokens, ChessBitboards *bbs, MagicInfo *magic,
     btime = strtoul(vec_get(tokens, i + 1), NULL, 10);
   }
   if ((i = vec_indexof(tokens, STRING, "turn")) != -1) {
-    turn = strtoul(vec_get(tokens, i + 1), NULL, 10);
+    turn = strtol(vec_get(tokens, i + 1), NULL, 10);
+  }
+
+  // Check if the current player is already in checkmate/stalemate
+  int already_over = engine_check_game_over(bbs, magic, turn);
+  if (already_over == 1) {
+    snprintf(response, MAX_RESPONSE, "gameover checkmate\n");
+    return;
+  } else if (already_over == 2) {
+    snprintf(response, MAX_RESPONSE, "gameover stalemate\n");
+    return;
   }
 
   EvalResult eval_res = search(bbs, magic, depth, turn);
   String chess_not = move_info_to_chess_notation(eval_res.best_move);
   engine_move(bbs, GET_FROM_POS(eval_res.best_move), GET_TO_POS(eval_res.best_move)); // TODO: remove?
-  snprintf(response, MAX_RESPONSE, "bestmove %s\n", chess_not.data);
+
+  // Check if the opponent is now in checkmate or stalemate
+  enum PieceColor opponent = (turn == WHITE) ? BLACK : WHITE;
+  int game_over = engine_check_game_over(bbs, magic, opponent);
+
+  if (game_over == 1) {
+      snprintf(response, MAX_RESPONSE, "bestmove %s\ngameover checkmate\n", chess_not.data);
+  } else if (game_over == 2) {
+      snprintf(response, MAX_RESPONSE, "bestmove %s\ngameover stalemate\n", chess_not.data);
+  } else {
+      snprintf(response, MAX_RESPONSE, "bestmove %s\n", chess_not.data);
+  }
+
   printf("Best Score: %d\n", eval_res.eval);
   str_free(&chess_not);
 }
