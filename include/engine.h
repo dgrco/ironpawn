@@ -18,11 +18,14 @@ typedef struct {
 #define GET_FROM_POS(move) (move & ((1U << 6) - 1))
 #define GET_TO_POS(move) (move & 0b111111000000) >> 6
 
+#define FLAG_PROMOTION 0x1000 // bit 12
+
 /**
  * @brief A 16-bit value where:
  * bits 0-5: The 'from' position (0-63).
  * bits 6-11: The 'to' position (0-63).
- * bits 12-15: TODO: special flags (en passant, etc.).
+ * bit  12: Promotion flag
+ * bits 13-15: TODO: special flags (en passant, etc.).
  */
 typedef uint16_t move_info_t;
 
@@ -109,6 +112,8 @@ Piece engine_move(ChessBitboards *bbs, unsigned int from_pos,
  */
 void engine_undo_capture(ChessBitboards *bbs, Piece *captured,
                          unsigned int captured_pos);
+
+void engine_undo_promotion(ChessBitboards *bbs, unsigned int pos, enum PieceColor color);
 
 /**
  * @brief Returns a String of the move in chess notation (i.e., e2e4)

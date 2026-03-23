@@ -210,7 +210,8 @@ BITBOARD __get_blocking_diag_mask(unsigned int pos) {
  *
  * @param pos: square position (pos 0 -> h1, pos 63 -> a8)
  * @param capture_offsets: a list of 2 elements giving the offsets for pawn
- * captures. NOTE: the format should be {file_a_facing_offset, file_h_facing_offset}.
+ * captures. NOTE: the format should be {file_a_facing_offset,
+ * file_h_facing_offset}.
  * TODO: change the param to a struct for clarity.
  *
  * @return The capture mask for the given square position.

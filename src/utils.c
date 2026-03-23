@@ -1,17 +1,13 @@
 #include "utils.h"
-#include "engine.h"
 #include <ctype.h>
-#include <string.h>
 #include <stdlib.h>
-
+#include <string.h>
 
 /////////////////////////////////
 /// String
 
 /// Create a "dead" string (a string with empty defaults)
-String str_dead() {
-  return (String){.data = NULL, .len = 0};
-}
+String str_dead() { return (String){.data = NULL, .len = 0}; }
 
 /// Create a new string, initialized with a given string literal
 String str_create(const char *initial) {
@@ -24,14 +20,15 @@ String str_create(const char *initial) {
   return str;
 }
 
-/// Create a new string from a vector of strings, each element is separated by a space.
+/// Create a new string from a vector of strings, each element is separated by a
+/// space.
 String str_create_from_strvec(Vec *vec) {
   size_t str_len = 0;
   for (size_t i = 0; i < vec->len; i++) {
     str_len += strlen(vec->data[i]);
   }
   str_len += vec->len - 1; // for spaces between elements
-  str_len += 1; // for null terminator
+  str_len += 1;            // for null terminator
 
   char *str_res = (char *)calloc(str_len, sizeof(char));
 
@@ -60,7 +57,7 @@ void str_read_from_stdin(String *str, unsigned long maxlen) {
   memset(buffer, 0, (maxlen + 1) * sizeof(char));
   fgets(buffer, maxlen, stdin);
   str->len = strnlen(buffer, maxlen);
-  str->data = (char*)realloc(str->data, str->len + 1);
+  str->data = (char *)realloc(str->data, str->len + 1);
   if (!str->data) {
     fprintf(stderr, "Cannot read from standard input. Reallocation issue.\n");
     exit(1);
@@ -69,9 +66,7 @@ void str_read_from_stdin(String *str, unsigned long maxlen) {
 }
 
 /// Check if a string equals another string literal
-bool str_eq(char *str, const char *other) {
-  return !strcmp(str, other);
-}
+bool str_eq(char *str, const char *other) { return !strcmp(str, other); }
 
 /// Strip leading and trailing whitespace from a String
 /// NOTE: treats newline as whitespace then appends it again after truncating.
@@ -83,7 +78,8 @@ void str_strip(String *str) {
   }
   // Find last non-whitespace character
   char *end = str->data + str->len - 1;
-  while (end > start && (isspace((unsigned char)*end) || (unsigned char)*end == '\n')) {
+  while (end > start &&
+         (isspace((unsigned char)*end) || (unsigned char)*end == '\n')) {
     end--;
   }
 
@@ -92,9 +88,13 @@ void str_strip(String *str) {
   *(end + 2) = '\0';
 
   if (start != str->data) {
-    memmove(str->data, start, end - start + 3); // + 3 since we need to account for newline and null terminator
+    memmove(
+        str->data, start,
+        end - start +
+            3); // + 3 since we need to account for newline and null terminator
   }
-  str->len = end - start + 2; // + 2 since we need to account for newline and null terminator
+  str->len = end - start +
+             2; // + 2 since we need to account for newline and null terminator
 }
 
 /// Split a string into tokens (whitespace-separated words).
@@ -145,13 +145,13 @@ void str_replace(String *str, char *new_str, size_t maxlen) {
 }
 
 /// Print a String
-void str_println(String *str) {
-  printf("%s\n", str->data);
-}
+void str_println(String *str) { printf("%s\n", str->data); }
 
 /// Print the debug info for a String
 void str_printdebug(String *str) {
-  printf("{content: \"%s\", length: %lu, String address: %p, data address: %p}\n", str->data, str->len, str, str->data);
+  printf(
+      "{content: \"%s\", length: %lu, String address: %p, data address: %p}\n",
+      str->data, str->len, str, str->data);
 }
 
 /////////////////////////////////
@@ -160,18 +160,17 @@ void str_printdebug(String *str) {
 /// Vector
 
 /// Create a "dead" vector (one with empty defaults).
-Vec vec_dead() {
-  return (Vec){.data = NULL, .len = 0, .cap = 0};
-}
+Vec vec_dead() { return (Vec){.data = NULL, .len = 0, .cap = 0}; }
 
 /// Create a new empty vector.
 Vec vec_create() {
   Vec vec = {.data = NULL, .len = 0, .cap = 8};
-  vec.data = (void**)calloc(vec.cap, sizeof(void*));
+  vec.data = (void **)calloc(vec.cap, sizeof(void *));
   return vec;
 }
 
-/// Free a vector and its inner contents. NOTE: the contents must be heap allocated.
+/// Free a vector and its inner contents. NOTE: the contents must be heap
+/// allocated.
 void vec_free(Vec *vec) {
   if (!vec) {
     return;
@@ -202,7 +201,7 @@ void vec_freeref(Vec *vec) {
 
 /// Helper: grow the vector's capacity by a factor of 2
 void vec_grow(Vec *vec) {
-  void **new_data = (void**)realloc(vec->data, 2 * vec->cap * sizeof(void*));
+  void **new_data = (void **)realloc(vec->data, 2 * vec->cap * sizeof(void *));
   if (new_data) {
     vec->data = new_data;
     vec->cap *= 2;
@@ -218,7 +217,8 @@ void vec_append(Vec *vec, void *item) {
   vec->len += 1;
 }
 
-/// Get element from the vector at a given index. NOTE: this returns the pointer due to generics.
+/// Get element from the vector at a given index. NOTE: this returns the pointer
+/// due to generics.
 void *vec_get(Vec *vec, size_t index) {
   assert(index < vec->len);
   return vec->data[index];
@@ -228,19 +228,19 @@ void *vec_get(Vec *vec, size_t index) {
 bool vec_contains(Vec *vec, enum VecType type, void *element) {
   if (type == STRING) {
     for (size_t i = 0; i < vec->len; i++) {
-      if (str_eq(vec->data[i], (char*)element)) {
+      if (str_eq(vec->data[i], (char *)element)) {
         return true;
       }
     }
   } else if (type == INT) {
     for (size_t i = 0; i < vec->len; i++) {
-      if (*(int*)vec->data[i] == *(int*)element) {
+      if (*(int *)vec->data[i] == *(int *)element) {
         return true;
       }
     }
   } else if (type == FLOAT) {
     for (size_t i = 0; i < vec->len; i++) {
-      if (*(float*)vec->data[i] == *(float*)element) {
+      if (*(float *)vec->data[i] == *(float *)element) {
         return true;
       }
     }
@@ -281,11 +281,11 @@ int vec_indexof(Vec *vec, enum VecType type, void *element) {
 
 /// Return a (reference) sub-vector of a given vector.
 /// If endpos is the end of the vector, you can set endpos to -1.
-/// NOTE: This operation does not create a copy of the elements, it merely references them.
-/// So avoid using vec_free() on the returned vector, as it will cause a double free.
-/// Instead, use vec_freeref().
+/// NOTE: This operation does not create a copy of the elements, it merely
+/// references them. So avoid using vec_free() on the returned vector, as it
+/// will cause a double free. Instead, use vec_freeref().
 Vec vec_refsubvec(Vec *vec, size_t startpos, ssize_t endpos) {
-  assert(startpos < vec->len && (endpos == -1 || (size_t) endpos < vec->len));
+  assert(startpos < vec->len && (endpos == -1 || (size_t)endpos < vec->len));
   if (endpos == -1) {
     endpos = vec->len;
   }
@@ -296,30 +296,31 @@ Vec vec_refsubvec(Vec *vec, size_t startpos, ssize_t endpos) {
   return subvec;
 }
 
-/// Print the contents of the Vec. NOTE: if the type is incorrect there will be undefined behavior.
+/// Print the contents of the Vec. NOTE: if the type is incorrect there will be
+/// undefined behavior.
 void vec_print(Vec *vec, enum VecType type) {
   char fmt[10] = {0};
   switch (type) {
-    case INT: {
-      strncpy(fmt, "%ld", 4);
-      break;
-    };
-    case FLOAT: {
-      strncpy(fmt, "%f", 3);
-      break;
-    };
-    case STRING: {
-      strncpy(fmt, "%s", 3);
-      break;
-    };
+  case INT: {
+    strncpy(fmt, "%ld", 4);
+    break;
+  };
+  case FLOAT: {
+    strncpy(fmt, "%f", 3);
+    break;
+  };
+  case STRING: {
+    strncpy(fmt, "%s", 3);
+    break;
+  };
   }
 
   printf("[");
   for (size_t i = 0; i < vec->len; i++) {
     if (type == INT) {
-      printf(fmt, *(long*)vec->data[i]);
+      printf(fmt, *(long *)vec->data[i]);
     } else if (type == FLOAT) {
-      printf(fmt, *(float*)vec->data[i]);
+      printf(fmt, *(float *)vec->data[i]);
     } else if (type == STRING) {
       printf(fmt, (char *)vec->data[i]);
     }
@@ -332,4 +333,3 @@ void vec_print(Vec *vec, enum VecType type) {
 }
 
 /////////////////////////////////
-

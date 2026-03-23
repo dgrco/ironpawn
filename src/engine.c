@@ -2,7 +2,6 @@
 #include "bitboard.h"
 #include "utils.h"
 #include <assert.h>
-#include <stdio.h>
 #include <stdlib.h>
 
 /**
@@ -251,6 +250,8 @@ void engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
       unsigned int to_pos = POP_LSB(single_push);
       unsigned int from_pos = to_pos - 8;
       move_info_t move = from_pos | (to_pos << 6);
+      if (to_pos >= 56)
+        move |= FLAG_PROMOTION;
       move_arr->moves[move_arr->len++] = move;
     }
     while (double_push) {
@@ -268,6 +269,8 @@ void engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
       while (possible_captures) {
         unsigned int to_pos = POP_LSB(possible_captures);
         move_info_t move = from_pos | (to_pos << 6);
+        if (to_pos >= 56)
+          move |= FLAG_PROMOTION;
         move_arr->moves[move_arr->len++] = move;
       }
     }
@@ -384,6 +387,8 @@ void engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
       unsigned int to_pos = POP_LSB(single_push);
       unsigned int from_pos = to_pos + 8;
       move_info_t move = from_pos | (to_pos << 6);
+      if (to_pos <= 7)
+        move |= FLAG_PROMOTION;
       move_arr->moves[move_arr->len++] = move;
     }
     while (double_push) {
@@ -401,6 +406,8 @@ void engine_generate_pseudolegal_moves(ChessBitboards *bbs, MagicInfo *magic,
       while (possible_captures) {
         unsigned int to_pos = POP_LSB(possible_captures);
         move_info_t move = from_pos | (to_pos << 6);
+        if (to_pos <= 7)
+          move |= FLAG_PROMOTION;
         move_arr->moves[move_arr->len++] = move;
       }
     }
@@ -457,32 +464,35 @@ bool engine_color_in_check(ChessBitboards *bbs, MagicInfo *magic_info,
  */
 int engine_check_game_over(ChessBitboards *bbs, MagicInfo *magic,
                            enum PieceColor color) {
-    MoveArray moves;
-    engine_generate_pseudolegal_moves(bbs, magic, &moves, color);
+  MoveArray moves;
+  engine_generate_pseudolegal_moves(bbs, magic, &moves, color);
 
-    for (unsigned int i = 0; i < moves.len; i++) {
-        unsigned int from_pos = GET_FROM_POS(moves.moves[i]);
-        unsigned int to_pos = GET_TO_POS(moves.moves[i]);
+  for (unsigned int i = 0; i < moves.len; i++) {
+    move_info_t move = moves.moves[i];
+    unsigned int from_pos = GET_FROM_POS(move);
+    unsigned int to_pos = GET_TO_POS(move);
 
-        // Make the move
-        Piece captured = engine_move(bbs, from_pos, to_pos);
+    // Make the move
+    Piece captured = engine_move(bbs, from_pos, to_pos);
 
-        bool still_in_check = engine_color_in_check(bbs, magic, color);
+    bool still_in_check = engine_color_in_check(bbs, magic, color);
 
-        // Undo the move — move piece back, restore capture
-        engine_move(bbs, to_pos, from_pos);
-        engine_undo_capture(bbs, &captured, to_pos);
+    // Undo the move — move piece back, restore capture
+    if (move & FLAG_PROMOTION)
+      engine_undo_promotion(bbs, to_pos, color);
+    engine_move(bbs, to_pos, from_pos);
+    engine_undo_capture(bbs, &captured, to_pos);
 
-        if (!still_in_check) {
-            return 0; // Found at least one legal move, game not over
-        }
+    if (!still_in_check) {
+      return 0; // Found at least one legal move, game not over
     }
+  }
 
-    // No legal moves found
-    if (engine_color_in_check(bbs, magic, color)) {
-        return 1; // Checkmate
-    }
-    return 2; // Stalemate
+  // No legal moves found
+  if (engine_color_in_check(bbs, magic, color)) {
+    return 1; // Checkmate
+  }
+  return 2; // Stalemate
 }
 
 /**
@@ -649,6 +659,20 @@ Piece engine_move(ChessBitboards *bbs, unsigned int from_pos,
   clear_bit(&bbs->empty_squares, to_pos);
   set_bit(&bbs->empty_squares, from_pos);
 
+  // Pawn promotion (auto-queen)
+  if ((bbs->white_pawns & (0xFFULL << 56))) {
+    // white pawn reached rank 8
+    BITBOARD promo_pawns = bbs->white_pawns & (0xFFULL << 56);
+    bbs->white_pawns &= ~promo_pawns;
+    bbs->white_queens |= promo_pawns;
+  }
+  if ((bbs->black_pawns & 0xFFULL)) {
+    // black pawn reached rank 1
+    BITBOARD promo_pawns = bbs->black_pawns & 0xFFULL;
+    bbs->black_pawns &= ~promo_pawns;
+    bbs->black_queens |= promo_pawns;
+  }
+
   return captured_piece;
 }
 
@@ -705,6 +729,17 @@ void engine_undo_capture(ChessBitboards *bbs, Piece *captured,
   clear_bit(&bbs->empty_squares, captured_pos);
 }
 
+void engine_undo_promotion(ChessBitboards *bbs, unsigned int pos,
+                           enum PieceColor color) {
+  if (color == WHITE) {
+    clear_bit(&bbs->white_queens, pos);
+    set_bit(&bbs->white_pawns, pos);
+  } else {
+    clear_bit(&bbs->black_queens, pos);
+    set_bit(&bbs->black_pawns, pos);
+  }
+}
+
 /**
  * @brief Returns a String of the move in chess notation (i.e., e2e4)
  *
@@ -713,7 +748,7 @@ void engine_undo_capture(ChessBitboards *bbs, Piece *captured,
  * str_free().
  */
 String move_info_to_chess_notation(move_info_t move) {
-  char buffer[5] = {0};
+  char buffer[6] = {0};
   String str;
 
   unsigned int from_pos = GET_FROM_POS(move);
@@ -730,6 +765,10 @@ String move_info_to_chess_notation(move_info_t move) {
   buffer[1] = '0' + from_rank;
   buffer[2] = FILE_CHARS[to_file];
   buffer[3] = '0' + to_rank;
+
+  if (move & FLAG_PROMOTION) {
+    buffer[4] = 'q'; // always queen for now
+  }
 
   str = str_create(buffer);
   return str;

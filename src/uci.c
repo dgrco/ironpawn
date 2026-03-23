@@ -13,6 +13,7 @@ void handle_uci_init(char *response, const int MAX_RESPONSE) {
            "id name IronPawn\nid author Dante Grieco\nuciok\n");
 }
 
+// TODO: handle moves
 void handle_position(Vec *tokens, ChessBitboards *bbs, char *response,
                      const int MAX_RESPONSE) {
   String board_str = str_dead();
@@ -88,19 +89,24 @@ void handle_go(Vec *tokens, ChessBitboards *bbs, MagicInfo *magic,
 
   EvalResult eval_res = search(bbs, magic, depth, turn);
   String chess_not = move_info_to_chess_notation(eval_res.best_move);
-  engine_move(bbs, GET_FROM_POS(eval_res.best_move), GET_TO_POS(eval_res.best_move)); // TODO: remove?
+  engine_move(bbs, GET_FROM_POS(eval_res.best_move),
+              GET_TO_POS(eval_res.best_move)); // TODO: remove?
 
   // Check if the opponent is now in checkmate or stalemate
   enum PieceColor opponent = (turn == WHITE) ? BLACK : WHITE;
   int game_over = engine_check_game_over(bbs, magic, opponent);
 
   if (game_over == 1) {
-      snprintf(response, MAX_RESPONSE, "bestmove %s\ngameover checkmate\n", chess_not.data);
+    snprintf(response, MAX_RESPONSE, "bestmove %s\ngameover checkmate\n",
+             chess_not.data);
   } else if (game_over == 2) {
-      snprintf(response, MAX_RESPONSE, "bestmove %s\ngameover stalemate\n", chess_not.data);
+    snprintf(response, MAX_RESPONSE, "bestmove %s\ngameover stalemate\n",
+             chess_not.data);
   } else {
-      snprintf(response, MAX_RESPONSE, "bestmove %s\n", chess_not.data);
+    snprintf(response, MAX_RESPONSE, "bestmove %s\n", chess_not.data);
   }
+  // printf("DEBUG: best_move raw = %u, notation = %s, flags = %x\n",
+  //      eval_res.best_move, chess_not.data, eval_res.best_move & 0xF000);
 
   printf("Best Score: %d\n", eval_res.eval);
   str_free(&chess_not);

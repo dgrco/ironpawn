@@ -5,7 +5,7 @@ EMCODEDIRS=wasm
 INCDIRS=include
 
 EMCC=emcc
-EMFLAGS = -sEXPORTED_FUNCTIONS=_wasm_process_uci_command,_wasm_init_bitboards,_wasm_init_magic -sEXPORTED_RUNTIME_METHODS='["ccall", "cwrap", "UTF8ToString"]' -sALLOW_MEMORY_GROWTH=1 -s MODULARIZE=1 -sENVIRONMENT=web
+EMFLAGS = -sEXPORTED_FUNCTIONS=_wasm_process_uci_command,_wasm_init -sEXPORTED_RUNTIME_METHODS='["ccall", "cwrap", "UTF8ToString"]' -sALLOW_MEMORY_GROWTH=1 -sENVIRONMENT=web
 
 CC=gcc
 OPT=-O3

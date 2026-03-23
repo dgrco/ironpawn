@@ -2,7 +2,6 @@
 #include "bitboard.h"
 #include "engine.h"
 #include "magic_info.h"
-#include "utils.h"
 #include <limits.h>
 
 //
@@ -194,6 +193,8 @@ int __minimax(ChessBitboards *bbs, MagicInfo *magic, unsigned int depth,
 
     // Skip illegal moves (leaves own king in check)
     if (engine_color_in_check(bbs, magic, turn)) {
+      if (move & FLAG_PROMOTION)
+        engine_undo_promotion(bbs, to_pos, turn);
       engine_move(bbs, to_pos, from_pos);
       engine_undo_capture(bbs, &captured, to_pos);
       continue;
@@ -205,6 +206,8 @@ int __minimax(ChessBitboards *bbs, MagicInfo *magic, unsigned int depth,
     best_eval = (turn == WHITE) ? (eval > best_eval ? eval : best_eval)
                                 : (eval < best_eval ? eval : best_eval);
 
+    if (move & FLAG_PROMOTION)
+      engine_undo_promotion(bbs, to_pos, turn);
     engine_move(bbs, to_pos, from_pos);
     engine_undo_capture(bbs, &captured, to_pos);
 
@@ -221,8 +224,7 @@ int __minimax(ChessBitboards *bbs, MagicInfo *magic, unsigned int depth,
   if (!found_legal_move) {
     if (engine_color_in_check(bbs, magic, turn)) {
       // Checkmate: worse the deeper it is (prefer faster mates)
-      return turn == WHITE ? -9999900 + (int)(6 - depth)
-                           :  9999900 - (int)(6 - depth);
+      return turn == WHITE ? -9999900 - (int)depth : 9999900 + (int)depth;
     }
     return 0;
   }
@@ -257,6 +259,8 @@ EvalResult search(ChessBitboards *bbs, MagicInfo *magic, unsigned int depth,
 
     // Skip illegal moves
     if (engine_color_in_check(bbs, magic, turn)) {
+      if (move & FLAG_PROMOTION)
+        engine_undo_promotion(bbs, to_pos, turn);
       engine_move(bbs, to_pos, from_pos);
       engine_undo_capture(bbs, &captured, to_pos);
       continue;
@@ -268,10 +272,12 @@ EvalResult search(ChessBitboards *bbs, MagicInfo *magic, unsigned int depth,
     if ((turn == WHITE && eval > best_eval) ||
         (turn == BLACK && eval < best_eval)) {
       best_eval = eval;
-      best_move = from_pos | (to_pos << 6);
+      best_move = move;
     }
 
     // reset the move
+    if (move & FLAG_PROMOTION)
+      engine_undo_promotion(bbs, to_pos, turn);
     engine_move(bbs, to_pos, from_pos);
     engine_undo_capture(bbs, &captured, to_pos);
   }
